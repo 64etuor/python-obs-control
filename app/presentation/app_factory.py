@@ -12,9 +12,14 @@ from app.presentation.api.overlay_routes import router as overlay_router
 from app.hotkeys import hotkeys
 from typing import Optional
 import asyncio
+from pathlib import Path
+
+from app.infrastructure.cleanup.screenshot_retention import retention_loop
 
 _guard_stop_event: Optional[asyncio.Event] = None
 _guard_task: Optional[asyncio.Task] = None
+_ret_stop_event: Optional[asyncio.Event] = None
+_ret_task: Optional[asyncio.Task] = None
 
 
 def create_app() -> FastAPI:
@@ -81,6 +86,25 @@ async def _startup() -> None:
         except Exception as exc:
             logging.getLogger(__name__).warning("failed to start OBS guardian: %s", exc)
 
+    # Screenshot retention cleaner
+    try:
+        global _ret_stop_event, _ret_task
+        # Collect screenshot roots from hotkey defaults and env
+        ss_dir = getattr(hotkeys, "ss_dir", None)
+        paths: list[str] = []
+        if ss_dir is not None:
+            paths.append(str(Path(ss_dir)))
+        env_dir = os.getenv("SCREENSHOT_DIR")
+        if env_dir:
+            paths.append(env_dir)
+        # Deduplicate
+        paths = sorted({p for p in paths if p})
+        if paths:
+            _ret_stop_event = asyncio.Event()
+            _ret_task = asyncio.create_task(retention_loop(_ret_stop_event, paths))
+    except Exception as exc:
+        logging.getLogger(__name__).warning("failed to start screenshot retention: %s", exc)
+
 
 @app.on_event("shutdown")
 async def _shutdown() -> None:
@@ -94,6 +118,15 @@ async def _shutdown() -> None:
             _guard_stop_event.set()
         if _guard_task is not None:
             _guard_task.cancel()
+    except Exception:
+        pass
+    # stop retention
+    global _ret_stop_event, _ret_task
+    try:
+        if _ret_stop_event is not None:
+            _ret_stop_event.set()
+        if _ret_task is not None:
+            _ret_task.cancel()
     except Exception:
         pass
 

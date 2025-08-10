@@ -1,0 +1,5 @@
+{
+    "enabled": true,
+    "days": 30,
+    "interval_sec": 3600
+}
