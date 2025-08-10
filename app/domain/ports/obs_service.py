@@ -1,0 +1,33 @@
+from __future__ import annotations
+
+from typing import Protocol
+
+
+class IObsService(Protocol):
+    async def get_version(self) -> dict: ...
+
+    async def get_scenes(self) -> list[dict]: ...
+
+    async def set_current_scene(self, scene_name: str) -> None: ...
+
+    async def save_source_screenshot(
+        self,
+        source_name: str,
+        image_file_path: str,
+        image_format: str = "png",
+        image_width: int | None = None,
+        image_height: int | None = None,
+        image_compression_quality: int = 100,
+    ) -> str: ...
+
+    async def set_input_settings(self, input_name: str, input_settings: dict, overlay: bool = False) -> None: ...
+
+    async def update_image_source_file(self, image_input_name: str, new_file_path: str) -> None: ...
+
+    async def start_streaming(self) -> None: ...
+
+    async def stop_streaming(self) -> None: ...
+
+    async def get_stream_status(self) -> dict: ...
+
+    async def toggle_streaming(self) -> None: ...

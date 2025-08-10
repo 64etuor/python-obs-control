@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     obs_password: str = ""
     obs_heartbeat: float = 15.0
 
+    # Auto bootstrap OBS layout on startup
+    auto_bootstrap: bool = True
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

@@ -5,5 +5,5 @@ Param(
 
 $env:PYTHONPATH = "$PSScriptRoot"
 
-uvicorn app.main:app --host $Bind --port $Port --reload
+uvicorn app.presentation.app_factory:app --host $Bind --port $Port --reload
 

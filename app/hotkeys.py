@@ -20,20 +20,28 @@ class HotkeyManager:
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
 
-        # Single-action fallbacks
+        # Single-action fallbacks (canonical defaults)
         self.scene_key = os.getenv("HOTKEY_SCENE_KEY", "F10")
-        self.scene_name = os.getenv("HOTKEY_SCENE_NAME", "home-view")
+        self.scene_name = os.getenv("HOTKEY_SCENE_NAME", "Home")
 
         self.ss_key = os.getenv("HOTKEY_SCREENSHOT_KEY", "F12")
-        self.ss_source = os.getenv("HOTKEY_SCREENSHOT_SOURCE", "cam-front")
+        self.ss_source = os.getenv("HOTKEY_SCREENSHOT_SOURCE", "cam_front")
         self.ss_dir = Path(os.getenv("SCREENSHOT_DIR", str(Path.home() / "Pictures" / "OBS-Screenshots")))
         # 날짜별 폴더 분할 옵션
         self.ss_split_by_date = os.getenv("SCREENSHOT_SPLIT_BY_DATE", "1").strip() not in {"0", "false", "False"}
         self.ss_format = os.getenv("SCREENSHOT_FORMAT", "png")
         self.ss_width = int(os.getenv("SCREENSHOT_WIDTH", "1080"))
         self.ss_height = int(os.getenv("SCREENSHOT_HEIGHT", "1920"))
-        # 스크린샷 후 지정 이미지 입력 업데이트(기본 front 입력명)
-        self.ss_update_input = os.getenv("SCREENSHOT_UPDATE_INPUT", "pic-before-procedure-front")
+        # 기본 업데이트 입력(프론트용)
+        self.ss_update_input = os.getenv("SCREENSHOT_UPDATE_INPUT", "img_before_front")
+
+        self.ss_side_key = os.getenv("HOTKEY_SCREENSHOT_SIDE_KEY", "F7")
+        self.ss_side_source = os.getenv("HOTKEY_SCREENSHOT_SIDE_SOURCE", "cam_side")
+        self.ss_side_update_input = os.getenv("SCREENSHOT_UPDATE_INPUT_SIDE", "img_before_side")
+
+        self.ss_rear_key = os.getenv("HOTKEY_SCREENSHOT_REAR_KEY", "F8")
+        self.ss_rear_source = os.getenv("HOTKEY_SCREENSHOT_REAR_SOURCE", "cam_rear")
+        self.ss_rear_update_input = os.getenv("SCREENSHOT_UPDATE_INPUT_REAR", "img_before_rear")
 
         self.stream_toggle_key = os.getenv("HOTKEY_STREAM_TOGGLE_KEY", "F9")
 
@@ -97,17 +105,20 @@ class HotkeyManager:
             except Exception:
                 pass
 
-        # Screenshot map registrations
+        # Screenshot map registrations (generic)
         for key_combo, source in self.screenshot_map.items():
             self._registered.append(
-                keyboard.add_hotkey(key_combo, lambda src=source: keyboard.call_later(lambda: self._take_screenshot_source(src)))
+                keyboard.add_hotkey(
+                    key_combo,
+                    lambda src=source: keyboard.call_later(lambda: self._take_screenshot_source(src)),
+                )
             )
             try:
                 print(f"[hotkeys] bind {key_combo} -> screenshot '{source}'")
             except Exception:
                 pass
 
-        # Backward-compatible single bindings
+        # Backward-compatible single bindings (front default)
         if self.scene_name:
             self._registered.append(
                 keyboard.add_hotkey(self.scene_key, lambda: keyboard.call_later(self._switch_scene))
@@ -118,9 +129,38 @@ class HotkeyManager:
             )
             try:
                 extra = f", update_input='{self.ss_update_input}'" if self.ss_update_input else ""
-                print(f"[hotkeys] bind {self.ss_key} -> screenshot '{self.ss_source}' {self.ss_width}x{self.ss_height}{extra}")
+                print(
+                    f"[hotkeys] bind {self.ss_key} -> screenshot '{self.ss_source}' {self.ss_width}x{self.ss_height}{extra}"
+                )
             except Exception:
                 pass
+
+        # New: side/rear dedicated keys
+        if self.ss_side_source and self.ss_side_key:
+            self._registered.append(
+                keyboard.add_hotkey(
+                    self.ss_side_key, lambda: keyboard.call_later(lambda: self._take_screenshot_source_custom(self.ss_side_source, self.ss_side_update_input))
+                )
+            )
+            try:
+                print(
+                    f"[hotkeys] bind {self.ss_side_key} -> screenshot '{self.ss_side_source}' (update '{self.ss_side_update_input}')"
+                )
+            except Exception:
+                pass
+        if self.ss_rear_source and self.ss_rear_key:
+            self._registered.append(
+                keyboard.add_hotkey(
+                    self.ss_rear_key, lambda: keyboard.call_later(lambda: self._take_screenshot_source_custom(self.ss_rear_source, self.ss_rear_update_input))
+                )
+            )
+            try:
+                print(
+                    f"[hotkeys] bind {self.ss_rear_key} -> screenshot '{self.ss_rear_source}' (update '{self.ss_rear_update_input}')"
+                )
+            except Exception:
+                pass
+
         if self.stream_toggle_key:
             self._registered.append(
                 keyboard.add_hotkey(self.stream_toggle_key, lambda: keyboard.call_later(self._toggle_stream))
@@ -148,9 +188,12 @@ class HotkeyManager:
         await obs_manager.set_current_scene(scene_name)
 
     def _take_screenshot(self):
-        self._take_screenshot_source(self.ss_source)
+        self._take_screenshot_source_custom(self.ss_source, self.ss_update_input)
 
     def _take_screenshot_source(self, source_name: str):
+        self._take_screenshot_source_custom(source_name, self.ss_update_input)
+
+    def _take_screenshot_source_custom(self, source_name: str, update_input: str | None):
         now = datetime.now()
         ts = now.strftime("%Y%m%d_%H%M%S")
         safe_source = re.sub(r"[^A-Za-z0-9._-]+", "_", source_name)
@@ -178,13 +221,13 @@ class HotkeyManager:
                 )
             )
             print(f"[hotkeys] 스크린샷 저장: {saved}")
-            if self.ss_update_input:
+            if update_input:
                 try:
-                    asyncio.run(obs_manager.update_image_source_file(self.ss_update_input, str(saved)))
-                    print(f"[hotkeys] 이미지 입력 업데이트: {self.ss_update_input} -> {saved}")
+                    asyncio.run(obs_manager.update_image_source_file(update_input, str(saved)))
+                    print(f"[hotkeys] 이미지 입력 업데이트: {update_input} -> {saved}")
                 except Exception as exc:
                     try:
-                        print(f"[hotkeys] 이미지 입력 업데이트 실패: {self.ss_update_input} - {exc}")
+                        print(f"[hotkeys] 이미지 입력 업데이트 실패: {update_input} - {exc}")
                     except Exception:
                         print("[hotkeys] 이미지 입력 업데이트 실패")
         except Exception as exc:
