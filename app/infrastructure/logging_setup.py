@@ -9,6 +9,8 @@ from logging import Handler
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
 from pathlib import Path
 from typing import Any
+import socket
+import shutil
 
 from app.config import settings
 
@@ -57,6 +59,12 @@ class JsonFormatter(logging.Formatter):
             "process": record.process,
             "thread": record.thread,
         }
+        # ELK-friendly additional fields
+        payload["service"] = getattr(settings, "app_name", "app")
+        payload["host"] = socket.gethostname()
+        env_name = os.getenv("ENV") or os.getenv("ENVIRONMENT") or None
+        if env_name:
+            payload["environment"] = env_name
         # extras
         for k, v in record.__dict__.items():
             if k not in _STANDARD_LOG_KEYS and k not in payload:
@@ -132,6 +140,36 @@ def init_logging() -> None:
                     encoding="utf-8",
                     utc=bool(getattr(settings, "log_utc", True)),
                 )
+                # Daily split into logs/YYYY-MM-DD/server.log on rollover
+                if bool(getattr(settings, "log_daily_split", True)):
+                    # Use simple date suffix to parse
+                    fh.suffix = "%Y-%m-%d"
+
+                    def _namer(default_name: str) -> str:  # e.g., logs/server.log.2025-08-11
+                        return default_name
+
+                    def _rotator(source: str, dest: str) -> None:
+                        # Move rotated file into dated subdir
+                        base_dir = Path(settings.log_dir)
+                        date_suffix = Path(dest).name.split(".")[-1]
+                        out_dir = base_dir / date_suffix
+                        try:
+                            out_dir.mkdir(parents=True, exist_ok=True)
+                        except Exception:
+                            pass
+                        target = out_dir / Path(settings.log_file_name)
+                        try:
+                            shutil.move(source, os.fspath(target))
+                        except Exception:
+                            # Fallback: copy then remove
+                            shutil.copy2(source, target)
+                            try:
+                                os.remove(source)
+                            except Exception:
+                                pass
+
+                    fh.namer = _namer
+                    fh.rotator = _rotator
             else:
                 fh = RotatingFileHandler(
                     filename=os.fspath(log_path),

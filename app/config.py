@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     log_when: str = "midnight"  # 'S','M','H','D','midnight','W0'-'W6'
     log_interval: int = 1
     log_utc: bool = True
+    # Split file by day into subdirectories logs/YYYY-MM-DD/filename
+    log_daily_split: bool = True
 
     # OBS WebSocket v5 connection
     obs_host: str = "127.0.0.1"
