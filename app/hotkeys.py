@@ -2,6 +2,7 @@ import os
 import re
 import threading
 import time
+import logging
 from datetime import datetime
 from pathlib import Path
 
@@ -18,6 +19,7 @@ from app.container import toast_success, toast_error
 
 class HotkeyManager:
     def __init__(self) -> None:
+        self._log = logging.getLogger(__name__)
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
 
@@ -72,6 +74,7 @@ class HotkeyManager:
 
     def start(self) -> None:
         if not _KEYBOARD_AVAILABLE:
+            self._log.warning("hotkeys disabled: keyboard module unavailable or permission denied")
             return
         if self._thread and self._thread.is_alive():
             return
@@ -87,6 +90,7 @@ class HotkeyManager:
                     keyboard.remove_hotkey(hk)
         except Exception:
             pass
+        self._log.info("hotkeys listener stopped")
 
     def _run(self) -> None:
         # Prepare dirs
@@ -95,16 +99,13 @@ class HotkeyManager:
         except Exception:
             pass
 
-        print("[hotkeys] starting hotkey listener")
+        self._log.info("hotkeys listener starting")
         # Scene map registrations
         for key_combo, scene in self.scene_map.items():
             self._registered.append(
                 keyboard.add_hotkey(key_combo, lambda s=scene: keyboard.call_later(lambda: self._switch_scene_name(s)))
             )
-            try:
-                print(f"[hotkeys] bind {key_combo} -> scene '{scene}'")
-            except Exception:
-                pass
+            self._log.info("bind %s -> scene '%s'", key_combo, scene)
 
         # Screenshot map registrations (generic)
         for key_combo, source in self.screenshot_map.items():
@@ -114,10 +115,7 @@ class HotkeyManager:
                     lambda src=source: keyboard.call_later(lambda: self._take_screenshot_source(src)),
                 )
             )
-            try:
-                print(f"[hotkeys] bind {key_combo} -> screenshot '{source}'")
-            except Exception:
-                pass
+            self._log.info("bind %s -> screenshot '%s'", key_combo, source)
 
         # Backward-compatible single bindings (front default)
         if self.scene_name:
@@ -128,13 +126,15 @@ class HotkeyManager:
             self._registered.append(
                 keyboard.add_hotkey(self.ss_key, lambda: keyboard.call_later(self._take_screenshot))
             )
-            try:
-                extra = f", update_input='{self.ss_update_input}'" if self.ss_update_input else ""
-                print(
-                    f"[hotkeys] bind {self.ss_key} -> screenshot '{self.ss_source}' {self.ss_width}x{self.ss_height}{extra}"
-                )
-            except Exception:
-                pass
+            extra = f", update_input='{self.ss_update_input}'" if self.ss_update_input else ""
+            self._log.info(
+                "bind %s -> screenshot '%s' %sx%s%s",
+                self.ss_key,
+                self.ss_source,
+                self.ss_width,
+                self.ss_height,
+                extra,
+            )
 
         # New: side/rear dedicated keys
         if self.ss_side_source and self.ss_side_key:
@@ -143,24 +143,24 @@ class HotkeyManager:
                     self.ss_side_key, lambda: keyboard.call_later(lambda: self._take_screenshot_source_custom(self.ss_side_source, self.ss_side_update_input))
                 )
             )
-            try:
-                print(
-                    f"[hotkeys] bind {self.ss_side_key} -> screenshot '{self.ss_side_source}' (update '{self.ss_side_update_input}')"
-                )
-            except Exception:
-                pass
+            self._log.info(
+                "bind %s -> screenshot '%s' (update '%s')",
+                self.ss_side_key,
+                self.ss_side_source,
+                self.ss_side_update_input,
+            )
         if self.ss_rear_source and self.ss_rear_key:
             self._registered.append(
                 keyboard.add_hotkey(
                     self.ss_rear_key, lambda: keyboard.call_later(lambda: self._take_screenshot_source_custom(self.ss_rear_source, self.ss_rear_update_input))
                 )
             )
-            try:
-                print(
-                    f"[hotkeys] bind {self.ss_rear_key} -> screenshot '{self.ss_rear_source}' (update '{self.ss_rear_update_input}')"
-                )
-            except Exception:
-                pass
+            self._log.info(
+                "bind %s -> screenshot '%s' (update '%s')",
+                self.ss_rear_key,
+                self.ss_rear_source,
+                self.ss_rear_update_input,
+            )
 
         if self.stream_toggle_key:
             self._registered.append(
@@ -183,7 +183,7 @@ class HotkeyManager:
         try:
             asyncio.run(self._async_switch_scene(scene_name))
         except Exception as exc:
-            print(f"[hotkeys] 씬 전환 실패: {scene_name} — {exc}")
+            self._log.error("scene switch failed: %s — %s", scene_name, exc)
 
     async def _async_switch_scene(self, scene_name: str):
         await obs_manager.set_current_scene(scene_name)
@@ -208,10 +208,7 @@ class HotkeyManager:
         out = target_dir / f"{ts}_{safe_source}.{self.ss_format}"
         import asyncio
         try:
-            try:
-                print(f"[hotkeys] screenshot '{source_name}' -> {out}")
-            except Exception:
-                pass
+            self._log.info("screenshot request: %s -> %s", source_name, out)
             saved = asyncio.run(
                 obs_manager.save_source_screenshot(
                     source_name=source_name,
@@ -221,26 +218,19 @@ class HotkeyManager:
                     image_height=self.ss_height,
                 )
             )
-            print(f"[hotkeys] 스크린샷 저장: {saved}")
+            self._log.info("screenshot saved: %s", saved)
             if update_input:
                 try:
                     asyncio.run(obs_manager.update_image_source_file(update_input, str(saved)))
-                    print(f"[hotkeys] 이미지 입력 업데이트: {update_input} -> {saved}")
+                    self._log.info("image input update: %s -> %s", update_input, saved)
                 except Exception as exc:
-                    try:
-                        print(f"[hotkeys] 이미지 입력 업데이트 실패: {update_input} - {exc}")
-                    except Exception:
-                        print("[hotkeys] 이미지 입력 업데이트 실패")
+                    self._log.error("image input update failed: %s — %s", update_input, exc)
             try:
                 asyncio.run(toast_success()(f"스크린샷 저장됨: {saved}", timeout_ms=2000))
             except Exception:
                 pass
         except Exception as exc:
-            try:
-                print(f"[hotkeys] 스크린샷 실패: {source_name} - {exc}")
-            except Exception:
-                # 콘솔 인코딩 문제 회피
-                print("[hotkeys] 스크린샷 실패")
+            self._log.error("screenshot failed: %s — %s", source_name, exc)
             try:
                 asyncio.run(toast_error()(f"스크린샷 실패: {exc}", timeout_ms=2000))
             except Exception:
@@ -250,9 +240,9 @@ class HotkeyManager:
         import asyncio
         try:
             asyncio.run(obs_manager.toggle_streaming())
-            print("[hotkeys] 스트림 토글 요청 보냄")
+            self._log.info("stream toggle requested")
         except Exception as exc:
-            print(f"[hotkeys] 스트림 토글 실패 — {exc}")
+            self._log.error("stream toggle failed: %s", exc)
 
 
 hotkeys = HotkeyManager()

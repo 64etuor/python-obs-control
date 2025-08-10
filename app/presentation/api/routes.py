@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Header
 
 from app.container import (
     get_obs_version,
@@ -12,6 +12,17 @@ from app.container import (
     toast_success,
 )
 from app.utils.screenshot import build_screenshot_path
+from app.config import settings
+from app.hotkeys import hotkeys
+from app.obs_client import obs_manager
+import logging
+import platform
+import psutil
+import time
+from datetime import datetime
+import sys
+import threading
+import traceback
 
 router = APIRouter(prefix="/api")
 
@@ -170,3 +181,212 @@ async def screenshot_rear(
         image_compression_quality=image_compression_quality,
         image_input_update=image_input_update,
     )
+
+
+# --------------------------------------
+# Diagnostics
+# --------------------------------------
+
+_LOG_BUFFER_MAX = 1000
+_log_records: list[dict] = []
+
+
+class _RingBufferHandler(logging.Handler):
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            data = {
+                "ts": datetime.fromtimestamp(record.created).isoformat(timespec="seconds"),
+                "level": record.levelname,
+                "name": record.name,
+                "msg": record.getMessage(),
+            }
+            _log_records.append(data)
+            if len(_log_records) > _LOG_BUFFER_MAX:
+                del _log_records[: len(_log_records) - _LOG_BUFFER_MAX]
+        except Exception:
+            pass
+
+
+_installed_ring = False
+
+
+def _ensure_ring_handler() -> None:
+    global _installed_ring
+    if _installed_ring:
+        return
+    logging.getLogger().addHandler(_RingBufferHandler())
+    _installed_ring = True
+
+
+def _check_diag_token(x_diag_token: str | None) -> None:
+    token = settings.diag_token
+    if token and (not x_diag_token or x_diag_token != token):
+        raise HTTPException(status_code=401, detail="invalid diagnostics token")
+
+
+@router.get("/diagnostics")
+async def diagnostics(x_diag_token: str | None = Header(default=None)) -> dict:
+    _ensure_ring_handler()
+    _check_diag_token(x_diag_token)
+
+    # OBS status
+    try:
+        stream = await obs_manager.get_stream_status()
+    except Exception as exc:  # noqa: BLE001
+        stream = {"error": str(exc)}
+
+    # Hotkey status
+    hk_status = {
+        "enabled": bool(hotkeys is not None),
+        "listener_alive": bool(getattr(hotkeys, "_thread", None) and hotkeys._thread.is_alive()),
+        "scene_key": getattr(hotkeys, "scene_key", None),
+        "screenshot_key": getattr(hotkeys, "ss_key", None),
+        "stream_toggle_key": getattr(hotkeys, "stream_toggle_key", None),
+        "scene_map": getattr(hotkeys, "scene_map", {}),
+    }
+
+    # System/process snapshot
+    vm = psutil.virtual_memory()
+    cpu = psutil.cpu_percent(interval=None)
+    proc = psutil.Process()
+    pm = proc.memory_info()
+
+    info = {
+        "app": {
+            "name": settings.app_name,
+            "time": datetime.utcnow().isoformat() + "Z",
+        },
+        "platform": {
+            "system": platform.system(),
+            "release": platform.release(),
+            "version": platform.version(),
+            "python": platform.python_version(),
+        },
+        "obs": {
+            "stream": stream,
+        },
+        "hotkeys": hk_status,
+        "system": {
+            "cpu_percent": cpu,
+            "mem_used_bytes": vm.used,
+            "mem_available_bytes": vm.available,
+        },
+        "process": {
+            "pid": proc.pid,
+            "cpu_percent": proc.cpu_percent(interval=None),
+            "rss_bytes": pm.rss,
+            "vms_bytes": pm.vms,
+            "num_threads": proc.num_threads(),
+            "uptime_seconds": max(0.0, time.time() - proc.create_time()),
+        },
+    }
+    return info
+
+
+@router.get("/logs")
+async def get_logs(limit: int = 200, x_diag_token: str | None = Header(default=None)) -> dict:
+    _ensure_ring_handler()
+    _check_diag_token(x_diag_token)
+    if limit <= 0:
+        limit = 100
+    if limit > _LOG_BUFFER_MAX:
+        limit = _LOG_BUFFER_MAX
+    return {"logs": _log_records[-limit:]}
+
+
+@router.get("/diagnostics/log-level")
+async def get_log_level(x_diag_token: str | None = Header(default=None)) -> dict:
+    _check_diag_token(x_diag_token)
+    level = logging.getLogger().getEffectiveLevel()
+    return {"level": logging.getLevelName(level)}
+
+
+@router.post("/diagnostics/log-level")
+async def set_log_level(level: str, x_diag_token: str | None = Header(default=None)) -> dict:
+    _check_diag_token(x_diag_token)
+    name = level.strip().upper()
+    if name not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
+        raise HTTPException(status_code=400, detail="invalid level")
+    logging.getLogger().setLevel(getattr(logging, name))
+    return {"ok": True, "level": name}
+
+
+@router.get("/diagnostics/threads")
+async def diagnostics_threads(x_diag_token: str | None = Header(default=None), max_frames: int = 20) -> dict:
+    _check_diag_token(x_diag_token)
+    frames = sys._current_frames()  # type: ignore[attr-defined]
+    threads = []
+    for th in threading.enumerate():
+        fid = getattr(th, "ident", None)
+        stack_summary = []
+        if fid in frames:
+            stack_summary = traceback.format_stack(frames[fid], limit=max_frames)
+        threads.append(
+            {
+                "name": th.name,
+                "daemon": th.daemon,
+                "alive": th.is_alive(),
+                "ident": fid,
+                "stack": stack_summary,
+            }
+        )
+    return {"threads": threads}
+
+
+@router.get("/diagnostics/processes")
+async def diagnostics_processes(x_diag_token: str | None = Header(default=None), limit: int = 10) -> dict:
+    _check_diag_token(x_diag_token)
+    if limit <= 0:
+        limit = 10
+    procs = []
+    # Prime cpu_percent snapshot
+    for p in psutil.process_iter(attrs=["pid", "name", "username"]):
+        try:
+            p.cpu_percent(None)
+        except Exception:
+            pass
+    time.sleep(0.05)
+    for p in psutil.process_iter(attrs=["pid", "name", "username"]):
+        try:
+            with p.oneshot():
+                cpu = p.cpu_percent(None)
+                mem = p.memory_info()
+                procs.append(
+                    {
+                        "pid": p.pid,
+                        "name": p.info.get("name"),
+                        "user": p.info.get("username"),
+                        "cpu_percent": cpu,
+                        "rss_bytes": mem.rss,
+                        "vms_bytes": mem.vms,
+                        "create_time": p.create_time(),
+                    }
+                )
+        except Exception:
+            continue
+    procs.sort(key=lambda x: (x.get("cpu_percent", 0.0), x.get("rss_bytes", 0)), reverse=True)
+    return {"processes": procs[:limit]}
+
+
+@router.get("/diagnostics/services")
+async def diagnostics_services(x_diag_token: str | None = Header(default=None)) -> dict:
+    _check_diag_token(x_diag_token)
+    out: list[dict] = []
+    if platform.system().lower().startswith("win") and hasattr(psutil, "win_service_iter"):
+        try:
+            for svc in psutil.win_service_iter():  # type: ignore[attr-defined]
+                try:
+                    info = svc.as_dict()
+                    out.append(
+                        {
+                            "name": info.get("name"),
+                            "display_name": info.get("display_name"),
+                            "status": info.get("status"),
+                            "start_type": info.get("start_type"),
+                        }
+                    )
+                except Exception:
+                    continue
+        except Exception:
+            pass
+    return {"services": out}
