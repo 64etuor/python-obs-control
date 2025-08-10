@@ -13,6 +13,7 @@ from app.hotkeys import hotkeys
 from typing import Optional
 import asyncio
 from pathlib import Path
+import os
 
 from app.infrastructure.cleanup.screenshot_retention import retention_loop
 

@@ -14,7 +14,7 @@ except Exception:
     _KEYBOARD_AVAILABLE = False
 
 from .obs_client import obs_manager
-from app.container import toast_success, toast_error
+from app.container import toast_success, toast_error, toast_warning
 
 
 class HotkeyManager:
@@ -72,6 +72,8 @@ class HotkeyManager:
             "IMG_RESET_TARGETS",
             "img_before_front,img_after_front,img_before_side,img_after_side,img_before_rear,img_after_rear,img_hair_reference",
         )
+        self.img_reset_confirm_window_sec = int(os.getenv("IMG_RESET_CONFIRM_WINDOW_SEC", "5"))
+        self._img_reset_armed_at: float | None = None
 
         self.stream_toggle_key = os.getenv("HOTKEY_STREAM_TOGGLE_KEY", "F9")
 
@@ -258,9 +260,9 @@ class HotkeyManager:
         # Reset all image inputs hotkey
         if self.img_reset_key:
             self._registered.append(
-                keyboard.add_hotkey(self.img_reset_key, lambda: keyboard.call_later(self._reset_all_img_inputs))
+                keyboard.add_hotkey(self.img_reset_key, lambda: keyboard.call_later(self._on_img_reset_hotkey))
             )
-            self._log.info("bind %s -> reset all image inputs", self.img_reset_key)
+            self._log.info("bind %s -> reset all image inputs (2-step confirm)", self.img_reset_key)
 
         if self.stream_toggle_key:
             self._registered.append(
@@ -365,6 +367,27 @@ class HotkeyManager:
             self._log.info("stream toggle requested")
         except Exception as exc:
             self._log.error("stream toggle failed: %s", exc)
+
+    def _on_img_reset_hotkey(self) -> None:
+        import asyncio
+        try:
+            now = time.time()
+            window = max(1, int(self.img_reset_confirm_window_sec))
+            if self._img_reset_armed_at is not None and (now - self._img_reset_armed_at) <= window:
+                # Confirmed within window
+                self._img_reset_armed_at = None
+                self._reset_all_img_inputs()
+                return
+            # Arm and prompt
+            self._img_reset_armed_at = now
+            try:
+                asyncio.run(
+                    toast_warning()(f"이미지 경로 초기화 준비됨: {window}초 내에 한번 더 누르면 실행", timeout_ms=min(window * 1000, 8000))
+                )
+            except Exception:
+                pass
+        except Exception as exc:
+            self._log.error("img reset hotkey handler failed: %s", exc)
 
 
 hotkeys = HotkeyManager()
