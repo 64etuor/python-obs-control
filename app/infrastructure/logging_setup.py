@@ -4,8 +4,9 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
+import time as _time
 from logging import Handler
-from logging.handlers import RotatingFileHandler
+from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
 from pathlib import Path
 from typing import Any
 
@@ -38,8 +39,14 @@ _STANDARD_LOG_KEYS = {
 
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
+        # Respect settings.log_utc for timestamp timezone
+        if bool(getattr(settings, "log_utc", True)):
+            _dt = datetime.fromtimestamp(record.created, tz=timezone.utc)
+        else:
+            _dt = datetime.fromtimestamp(record.created, tz=timezone.utc).astimezone()
+
         payload: dict[str, Any] = {
-            "time": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+            "time": _dt.isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -84,6 +91,11 @@ def init_logging() -> None:
         fmt="%(asctime)s %(levelname)s [%(name)s] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
+    # Use UTC or localtime for console timestamps per settings
+    if bool(getattr(settings, "log_utc", True)):
+        text_formatter.converter = _time.gmtime  # type: ignore[attr-defined]
+    else:
+        text_formatter.converter = _time.localtime  # type: ignore[attr-defined]
     json_formatter: logging.Formatter = JsonFormatter()
 
     # Stream handler (console)
@@ -111,12 +123,22 @@ def init_logging() -> None:
             return isinstance(handler, RotatingFileHandler) and getattr(handler, "baseFilename", None) == os.fspath(log_path)
 
         if not any(is_same_file_handler(h) for h in root.handlers):
-            fh = RotatingFileHandler(
-                filename=os.fspath(log_path),
-                maxBytes=int(settings.log_max_bytes),
-                backupCount=int(settings.log_backup_count),
-                encoding="utf-8",
-            )
+            if getattr(settings, "log_rotation", "size").lower() == "time":
+                fh = TimedRotatingFileHandler(
+                    filename=os.fspath(log_path),
+                    when=getattr(settings, "log_when", "midnight"),
+                    interval=int(getattr(settings, "log_interval", 1)),
+                    backupCount=int(settings.log_backup_count),
+                    encoding="utf-8",
+                    utc=bool(getattr(settings, "log_utc", True)),
+                )
+            else:
+                fh = RotatingFileHandler(
+                    filename=os.fspath(log_path),
+                    maxBytes=int(settings.log_max_bytes),
+                    backupCount=int(settings.log_backup_count),
+                    encoding="utf-8",
+                )
             fh.setLevel(level)
             fh.setFormatter(json_formatter)
             root.addHandler(fh)

@@ -139,6 +139,28 @@ async def screenshot_front(
     )
 
 
+@router.post("/obs/screenshot/front/after")
+async def screenshot_front_after(
+    image_file_path: str | None = None,
+    image_format: str = "png",
+    image_width: int | None = 1080,
+    image_height: int | None = 1920,
+    image_compression_quality: int = 100,
+    image_input_update: str | None = "img_after_front",
+) -> dict:
+    if not image_file_path:
+        image_file_path = build_screenshot_path("cam_front", image_format=image_format)
+    return await take_screenshot(
+        source_name="cam_front",
+        image_file_path=image_file_path,
+        image_format=image_format,
+        image_width=image_width,
+        image_height=image_height,
+        image_compression_quality=image_compression_quality,
+        image_input_update=image_input_update,
+    )
+
+
 @router.post("/obs/screenshot/side")
 async def screenshot_side(
     image_file_path: str | None = None,
@@ -161,6 +183,28 @@ async def screenshot_side(
     )
 
 
+@router.post("/obs/screenshot/side/after")
+async def screenshot_side_after(
+    image_file_path: str | None = None,
+    image_format: str = "png",
+    image_width: int | None = 1080,
+    image_height: int | None = 1920,
+    image_compression_quality: int = 100,
+    image_input_update: str | None = "img_after_side",
+) -> dict:
+    if not image_file_path:
+        image_file_path = build_screenshot_path("cam_side", image_format=image_format)
+    return await take_screenshot(
+        source_name="cam_side",
+        image_file_path=image_file_path,
+        image_format=image_format,
+        image_width=image_width,
+        image_height=image_height,
+        image_compression_quality=image_compression_quality,
+        image_input_update=image_input_update,
+    )
+
+
 @router.post("/obs/screenshot/rear")
 async def screenshot_rear(
     image_file_path: str | None = None,
@@ -169,6 +213,28 @@ async def screenshot_rear(
     image_height: int | None = 1920,
     image_compression_quality: int = 100,
     image_input_update: str | None = "img_before_rear",
+) -> dict:
+    if not image_file_path:
+        image_file_path = build_screenshot_path("cam_rear", image_format=image_format)
+    return await take_screenshot(
+        source_name="cam_rear",
+        image_file_path=image_file_path,
+        image_format=image_format,
+        image_width=image_width,
+        image_height=image_height,
+        image_compression_quality=image_compression_quality,
+        image_input_update=image_input_update,
+    )
+
+
+@router.post("/obs/screenshot/rear/after")
+async def screenshot_rear_after(
+    image_file_path: str | None = None,
+    image_format: str = "png",
+    image_width: int | None = 1080,
+    image_height: int | None = 1920,
+    image_compression_quality: int = 100,
+    image_input_update: str | None = "img_after_rear",
 ) -> dict:
     if not image_file_path:
         image_file_path = build_screenshot_path("cam_rear", image_format=image_format)

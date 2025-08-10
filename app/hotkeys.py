@@ -9,7 +9,7 @@ from pathlib import Path
 try:
     import keyboard  # type: ignore
     _KEYBOARD_AVAILABLE = True
-except Exception:  # keyboard 미설치/권한 문제 시 핫키 비활성화
+except Exception:
     keyboard = None  # type: ignore
     _KEYBOARD_AVAILABLE = False
 
@@ -27,7 +27,7 @@ class HotkeyManager:
         self.scene_key = os.getenv("HOTKEY_SCENE_KEY", "F10")
         self.scene_name = os.getenv("HOTKEY_SCENE_NAME", "Home")
 
-        self.ss_key = os.getenv("HOTKEY_SCREENSHOT_KEY", "F12")
+        self.ss_key = os.getenv("HOTKEY_SCREENSHOT_KEY", "F5")
         self.ss_source = os.getenv("HOTKEY_SCREENSHOT_SOURCE", "cam_front")
         self.ss_dir = Path(os.getenv("SCREENSHOT_DIR", str(Path.home() / "Pictures" / "OBS-Screenshots")))
         # 날짜별 폴더 분할 옵션
@@ -38,13 +38,28 @@ class HotkeyManager:
         # 기본 업데이트 입력(프론트용)
         self.ss_update_input = os.getenv("SCREENSHOT_UPDATE_INPUT", "img_before_front")
 
-        self.ss_side_key = os.getenv("HOTKEY_SCREENSHOT_SIDE_KEY", "F7")
+        # After-shot (시술 후) 기본값
+        self.ss_after_key = os.getenv("HOTKEY_SCREENSHOT_AFTER_KEY", "shift+F5")
+        self.ss_after_source = os.getenv("HOTKEY_SCREENSHOT_AFTER_SOURCE", "cam_front")
+        self.ss_after_update_input = os.getenv("SCREENSHOT_UPDATE_INPUT_AFTER", "img_after_front")
+
+        self.ss_side_key = os.getenv("HOTKEY_SCREENSHOT_SIDE_KEY", "F6")
         self.ss_side_source = os.getenv("HOTKEY_SCREENSHOT_SIDE_SOURCE", "cam_side")
         self.ss_side_update_input = os.getenv("SCREENSHOT_UPDATE_INPUT_SIDE", "img_before_side")
 
-        self.ss_rear_key = os.getenv("HOTKEY_SCREENSHOT_REAR_KEY", "F8")
+        # After-shot side
+        self.ss_side_after_key = os.getenv("HOTKEY_SCREENSHOT_SIDE_AFTER_KEY", "shift+F6")
+        self.ss_side_after_source = os.getenv("HOTKEY_SCREENSHOT_SIDE_AFTER_SOURCE", "cam_side")
+        self.ss_side_after_update_input = os.getenv("SCREENSHOT_UPDATE_INPUT_SIDE_AFTER", "img_after_side")
+
+        self.ss_rear_key = os.getenv("HOTKEY_SCREENSHOT_REAR_KEY", "F7")
         self.ss_rear_source = os.getenv("HOTKEY_SCREENSHOT_REAR_SOURCE", "cam_rear")
         self.ss_rear_update_input = os.getenv("SCREENSHOT_UPDATE_INPUT_REAR", "img_before_rear")
+
+        # After-shot rear
+        self.ss_rear_after_key = os.getenv("HOTKEY_SCREENSHOT_REAR_AFTER_KEY", "shift+F7")
+        self.ss_rear_after_source = os.getenv("HOTKEY_SCREENSHOT_REAR_AFTER_SOURCE", "cam_rear")
+        self.ss_rear_after_update_input = os.getenv("SCREENSHOT_UPDATE_INPUT_REAR_AFTER", "img_after_rear")
 
         self.stream_toggle_key = os.getenv("HOTKEY_STREAM_TOGGLE_KEY", "F9")
 
@@ -136,6 +151,23 @@ class HotkeyManager:
                 extra,
             )
 
+        # After-shot front
+        if self.ss_after_source and self.ss_after_key:
+            self._registered.append(
+                keyboard.add_hotkey(
+                    self.ss_after_key,
+                    lambda: keyboard.call_later(
+                        lambda: self._take_screenshot_source_custom(self.ss_after_source, self.ss_after_update_input)
+                    ),
+                )
+            )
+            self._log.info(
+                "bind %s -> screenshot(after) '%s' (update '%s')",
+                self.ss_after_key,
+                self.ss_after_source,
+                self.ss_after_update_input,
+            )
+
         # New: side/rear dedicated keys
         if self.ss_side_source and self.ss_side_key:
             self._registered.append(
@@ -149,6 +181,22 @@ class HotkeyManager:
                 self.ss_side_source,
                 self.ss_side_update_input,
             )
+        # After-shot side
+        if self.ss_side_after_source and self.ss_side_after_key:
+            self._registered.append(
+                keyboard.add_hotkey(
+                    self.ss_side_after_key,
+                    lambda: keyboard.call_later(
+                        lambda: self._take_screenshot_source_custom(self.ss_side_after_source, self.ss_side_after_update_input)
+                    ),
+                )
+            )
+            self._log.info(
+                "bind %s -> screenshot(after) '%s' (update '%s')",
+                self.ss_side_after_key,
+                self.ss_side_after_source,
+                self.ss_side_after_update_input,
+            )
         if self.ss_rear_source and self.ss_rear_key:
             self._registered.append(
                 keyboard.add_hotkey(
@@ -160,6 +208,22 @@ class HotkeyManager:
                 self.ss_rear_key,
                 self.ss_rear_source,
                 self.ss_rear_update_input,
+            )
+        # After-shot rear
+        if self.ss_rear_after_source and self.ss_rear_after_key:
+            self._registered.append(
+                keyboard.add_hotkey(
+                    self.ss_rear_after_key,
+                    lambda: keyboard.call_later(
+                        lambda: self._take_screenshot_source_custom(self.ss_rear_after_source, self.ss_rear_after_update_input)
+                    ),
+                )
+            )
+            self._log.info(
+                "bind %s -> screenshot(after) '%s' (update '%s')",
+                self.ss_rear_after_key,
+                self.ss_rear_after_source,
+                self.ss_rear_after_update_input,
             )
 
         if self.stream_toggle_key:
