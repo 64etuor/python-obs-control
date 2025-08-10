@@ -1,4 +1,4 @@
-## OBS WebSocket FastAPI 서버 (스켈레톤)
+## OBS WebSocket FastAPI 서버
 
 ### 설치
 
