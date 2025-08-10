@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Form
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from app.container import list_camera_devices, get_camera_config, apply_camera_config
@@ -26,7 +26,11 @@ async def config_get() -> dict:
 
 
 @router.post("/config")
-async def config_set(front: str | None = None, side: str | None = None, rear: str | None = None) -> dict:
+async def config_set(
+    front: str | None = Form(default=None),
+    side: str | None = Form(default=None),
+    rear: str | None = Form(default=None),
+) -> dict:
     try:
         return await apply_camera_config()(front=front, side=side, rear=rear)
     except Exception as exc:  # noqa: BLE001
@@ -84,13 +88,27 @@ function stopAllPreviews(){
 async function populateFromServer(selectIds){
   try{
     const dev = await fetch('/api/cams/devices').then(r=>r.json());
+    if(dev && dev.detail && Array.isArray(dev.detail.devices) && dev.detail.devices.length){
+      const pairs = dev.detail.devices.map(d=>({label: d.name, value: d.path || d.value || d.name}));
+      for(const id of selectIds){ fillSelectPairs(id, pairs); }
+      const detail = dev.detail.devices.map(d=>`<div><code>${d.name}</code> — <code>${d.path}</code></div>`).join('');
+      document.getElementById('detail_block').innerHTML = detail || '(no detail)';
+      return true;
+    }
     if(dev && Array.isArray(dev.devices) && dev.devices.length){
       for(const id of selectIds){ fillSelect(id, dev.devices); }
-      // detailed
-      if(dev.detail && Array.isArray(dev.detail.devices)){
-        const detail = dev.detail.devices.map(d=>`<div><code>${d.name}</code> — <code>${d.path}</code></div>`).join('');
-        document.getElementById('detail_block').innerHTML = detail || '(no detail)';
-      }
+      return true;
+    }
+  }catch(e){}
+
+  // Fallback: fill from OBS dshow property list (name/value)
+  try{
+    const obs = await fetch('/api/cams/devices/obs').then(r=>r.json());
+    const items = Array.isArray(obs?.obs) ? obs.obs : [];
+    if(items.length){
+      const pairs = items.map(it=>({label: it.name, value: it.value}));
+      for(const id of selectIds){ fillSelectPairs(id, pairs); }
+      document.getElementById('detail_block').innerHTML = items.map(d=>`<div><code>${d.name}</code> — <code>${d.value}</code></div>`).join('');
       return true;
     }
   }catch(e){}
@@ -105,6 +123,19 @@ function fillSelect(id, devices){
   for(const d of devices){
     if(!d || seen.has(d)) continue; seen.add(d);
     const o = document.createElement('option'); o.value=d; o.textContent=d; sel.appendChild(o);
+  }
+}
+
+function fillSelectPairs(id, pairs){
+  const sel = document.getElementById(id);
+  sel.innerHTML = '';
+  const none = document.createElement('option'); none.value=''; none.textContent='(none)'; sel.appendChild(none);
+  const seen = new Set();
+  for(const p of pairs||[]){
+    const v = p?.value ?? p?.path ?? p?.id ?? '';
+    const t = p?.label ?? p?.name ?? String(v||'');
+    if(!v || seen.has(v)) continue; seen.add(v);
+    const o = document.createElement('option'); o.value=String(v); o.textContent=String(t); sel.appendChild(o);
   }
 }
 

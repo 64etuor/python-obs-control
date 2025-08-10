@@ -13,6 +13,7 @@ except Exception:  # keyboard 미설치/권한 문제 시 핫키 비활성화
     _KEYBOARD_AVAILABLE = False
 
 from .obs_client import obs_manager
+from app.container import toast_success, toast_error
 
 
 class HotkeyManager:
@@ -230,12 +231,20 @@ class HotkeyManager:
                         print(f"[hotkeys] 이미지 입력 업데이트 실패: {update_input} - {exc}")
                     except Exception:
                         print("[hotkeys] 이미지 입력 업데이트 실패")
+            try:
+                asyncio.run(toast_success()(f"스크린샷 저장됨: {saved}", timeout_ms=2000))
+            except Exception:
+                pass
         except Exception as exc:
             try:
                 print(f"[hotkeys] 스크린샷 실패: {source_name} - {exc}")
             except Exception:
                 # 콘솔 인코딩 문제 회피
                 print("[hotkeys] 스크린샷 실패")
+            try:
+                asyncio.run(toast_error()(f"스크린샷 실패: {exc}", timeout_ms=2000))
+            except Exception:
+                pass
 
     def _toggle_stream(self):
         import asyncio

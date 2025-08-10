@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.presentation.api.routes import router as api_router
 from app.presentation.api.camera_routes import router as camera_router
+from app.presentation.api.overlay_routes import router as overlay_router
 from app.hotkeys import hotkeys
 
 
@@ -22,6 +23,7 @@ def create_app() -> FastAPI:
 
     app.include_router(api_router)
     app.include_router(camera_router)
+    app.include_router(overlay_router)
     return app
 
 

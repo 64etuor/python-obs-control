@@ -3,6 +3,8 @@ from __future__ import annotations
 from functools import lru_cache
 
 from app.infrastructure.obs.obs_service_impl import ObsService
+from app.infrastructure.overlay.notification_service_impl import overlay_notifications
+from app.domain.ports.notification_service import INotificationService
 from app.application.use_cases.obs_use_cases import (
     GetObsVersion,
     ListScenes,
@@ -12,6 +14,7 @@ from app.application.use_cases.obs_use_cases import (
     StopStream,
     ToggleStream,
 )
+from app.application.use_cases.toast_use_cases import ToastSuccess, ToastInfo, ToastError, ToastWarning
 from app.application.use_cases.camera_use_cases import (
     ListCameraDevices,
     GetCameraConfig,
@@ -23,6 +26,10 @@ from app.application.use_cases.camera_use_cases import (
 def obs_service() -> ObsService:
     return ObsService()
 
+
+@lru_cache(maxsize=1)
+def notification_service() -> INotificationService:
+    return overlay_notifications
 
 @lru_cache(maxsize=None)
 def get_obs_version() -> GetObsVersion:
@@ -72,3 +79,24 @@ def get_camera_config() -> GetCameraConfig:
 @lru_cache(maxsize=None)
 def apply_camera_config() -> ApplyCameraConfig:
     return ApplyCameraConfig()
+
+
+# Toast use-cases
+@lru_cache(maxsize=None)
+def toast_success() -> ToastSuccess:
+    return ToastSuccess(svc=notification_service())
+
+
+@lru_cache(maxsize=None)
+def toast_info() -> ToastInfo:
+    return ToastInfo(svc=notification_service())
+
+
+@lru_cache(maxsize=None)
+def toast_warning() -> ToastWarning:
+    return ToastWarning(svc=notification_service())
+
+
+@lru_cache(maxsize=None)
+def toast_error() -> ToastError:
+    return ToastError(svc=notification_service())

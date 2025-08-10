@@ -9,6 +9,7 @@ from app.container import (
     take_screenshot as uc_take_screenshot,
     start_stream as uc_start_stream,
     stop_stream as uc_stop_stream,
+    toast_success,
 )
 from app.utils.screenshot import build_screenshot_path
 
@@ -57,7 +58,7 @@ async def take_screenshot(
     image_input_update: str | None = None,
 ) -> dict:
     try:
-        return await uc_take_screenshot()(
+        result = await uc_take_screenshot()(
             source_name=source_name,
             image_file_path=image_file_path,
             image_format=image_format,
@@ -66,6 +67,16 @@ async def take_screenshot(
             image_compression_quality=image_compression_quality,
             image_input_update=image_input_update,
         )
+        # fire-and-forget toast
+        try:
+            import asyncio as _asyncio
+
+            _asyncio.create_task(
+                toast_success()(f"Screenshot saved: {result['path']}", timeout_ms=1500)
+            )
+        except Exception:
+            pass
+        return result
     except Exception as exc:  # noqa: BLE001
         s = str(exc)
         if "702" in s or "render screenshot" in s.lower():

@@ -56,7 +56,6 @@ async def ensure_scenes_exist(names: Iterable[str]) -> None:
 
 
 async def ensure_input_exists(input_name: string, kind: str) -> None:  # type: ignore[name-defined]
-    # Python typing hack above because obsws types vary; keep runtime simple.
     client = await obs_manager.connect()
     get = getattr(client, "get_input_list", None)
     add = getattr(client, "create_input", None)
