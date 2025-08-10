@@ -61,6 +61,18 @@ class HotkeyManager:
         self.ss_rear_after_source = os.getenv("HOTKEY_SCREENSHOT_REAR_AFTER_SOURCE", "cam_rear")
         self.ss_rear_after_update_input = os.getenv("SCREENSHOT_UPDATE_INPUT_REAR_AFTER", "img_after_rear")
 
+        # Hair reference: window_capture -> img_hair_reference
+        self.ss_hair_key = os.getenv("HOTKEY_SCREENSHOT_HAIR_KEY", "F8")
+        self.ss_hair_source = os.getenv("HOTKEY_SCREENSHOT_HAIR_SOURCE", "window_capture")
+        self.ss_hair_update_input = os.getenv("SCREENSHOT_UPDATE_HAIR_INPUT", "img_hair_reference")
+
+        # Reset all image inputs (clear file paths)
+        self.img_reset_key = os.getenv("HOTKEY_IMG_RESET_KEY", "ctrl+F8")
+        self.img_reset_targets = os.getenv(
+            "IMG_RESET_TARGETS",
+            "img_before_front,img_after_front,img_before_side,img_after_side,img_before_rear,img_after_rear,img_hair_reference",
+        )
+
         self.stream_toggle_key = os.getenv("HOTKEY_STREAM_TOGGLE_KEY", "F9")
 
         self.scene_map = self._parse_map_env("HOTKEY_SCENE_MAP")
@@ -226,6 +238,30 @@ class HotkeyManager:
                 self.ss_rear_after_update_input,
             )
 
+        # Hair reference hotkey: window_capture screenshot -> update img_hair_reference
+        if self.ss_hair_source and self.ss_hair_key:
+            self._registered.append(
+                keyboard.add_hotkey(
+                    self.ss_hair_key,
+                    lambda: keyboard.call_later(
+                        lambda: self._take_screenshot_source_custom(self.ss_hair_source, self.ss_hair_update_input)
+                    ),
+                )
+            )
+            self._log.info(
+                "bind %s -> screenshot '%s' (update '%s')",
+                self.ss_hair_key,
+                self.ss_hair_source,
+                self.ss_hair_update_input,
+            )
+
+        # Reset all image inputs hotkey
+        if self.img_reset_key:
+            self._registered.append(
+                keyboard.add_hotkey(self.img_reset_key, lambda: keyboard.call_later(self._reset_all_img_inputs))
+            )
+            self._log.info("bind %s -> reset all image inputs", self.img_reset_key)
+
         if self.stream_toggle_key:
             self._registered.append(
                 keyboard.add_hotkey(self.stream_toggle_key, lambda: keyboard.call_later(self._toggle_stream))
@@ -297,6 +333,28 @@ class HotkeyManager:
             self._log.error("screenshot failed: %s — %s", source_name, exc)
             try:
                 asyncio.run(toast_error()(f"스크린샷 실패: {exc}", timeout_ms=2000))
+            except Exception:
+                pass
+
+    def _reset_all_img_inputs(self):
+        import asyncio
+        try:
+            targets = [t.strip() for t in re.split(r"[,;\s]+", self.img_reset_targets) if t.strip()]
+            if not targets:
+                return
+            for name in targets:
+                try:
+                    asyncio.run(obs_manager.set_input_settings(name, {"file": ""}, False))
+                except Exception as exc:
+                    self._log.warning("image input reset failed for %s: %s", name, exc)
+            try:
+                asyncio.run(toast_success()(f"이미지 경로 초기화 완료: {len(targets)}개", timeout_ms=1800))
+            except Exception:
+                pass
+        except Exception as exc:
+            self._log.error("image inputs reset failed: %s", exc)
+            try:
+                asyncio.run(toast_error()(f"이미지 초기화 실패: {exc}", timeout_ms=2000))
             except Exception:
                 pass
 
