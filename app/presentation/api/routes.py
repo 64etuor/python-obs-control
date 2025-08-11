@@ -25,6 +25,7 @@ import sys
 import threading
 import traceback
 from app.infrastructure.obs.bootstrap import STANDARD_SCENES
+from app.infrastructure.overlay.notification_service_impl import overlay_notifications
 
 router = APIRouter(prefix="/api")
 
@@ -89,6 +90,12 @@ async def obs_scenes() -> dict:
 async def set_scene(scene_name: str) -> dict:
     try:
         await uc_set_scene()(scene_name)
+        try:
+            scene_norm = (scene_name or "").strip().lower()
+            action = "resume" if scene_norm in {"youtube", "shorts"} else "pause"
+            await overlay_notifications.publish({"type": "overlay_control", "action": action, "scene": scene_name})
+        except Exception:
+            pass
         return {"ok": True, "scene": scene_name}
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=str(exc))

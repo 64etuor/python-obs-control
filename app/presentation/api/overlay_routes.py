@@ -15,7 +15,7 @@ router = APIRouter(prefix="/overlay")
 async def overlay_index() -> HTMLResponse:
     legion = (settings.legion or "").strip().upper()
     show_header = legion == "KOREA"
-    brand_text = (settings.overlay_brand or "MIRRORLESS").strip()
+    brand_text = (settings.overlay_brand or "Mirroless").strip()
     brand_color = (settings.overlay_brand_color or "#ffffff").strip()
     clock_enabled = bool(settings.overlay_clock_enabled)
     # Build static HTML, inject dynamic flags via JS
@@ -278,6 +278,159 @@ async def overlay_youtube(
         "loadYT();"
         "document.addEventListener('visibilitychange',()=>{ if(!player||!ready) return; try{ if(document.hidden){player.pauseVideo();} else if(RESUME_ON_SHOW){player.playVideo();} }catch(_){ } });"
         "setInterval(()=>{ if(!player||!ready) return; try{ const t=Math.floor(player.getCurrentTime?.()||0); if(!Number.isFinite(t)) return; if(Math.abs(t-lastSaved)>=2){ localStorage.setItem('yt:'+VIDEO_ID,String(t)); lastSaved=t; } }catch(_){ } },2000);"
+        "</script></body></html>"
+    )
+    return HTMLResponse(content=html)
+
+
+@router.get("/shorts", response_class=HTMLResponse)
+async def overlay_shorts(
+    ids: str | None = None,
+    start_index: int = 0,
+    muted: bool = True,
+    controls: bool = False,
+    loop: bool = True,
+    resume_on_show: bool = True,
+    restore: bool = True,
+    playlist: str | None = None,
+    channel: str | None = None,
+    embed: bool = False,
+    embed_fallback: bool = True,
+) -> HTMLResponse:
+    # Two modes:
+    # 1) Explicit ids list (comma-separated)
+    # 2) Playlist or channel uploads (auto-advance handled by YT)
+    id_list: list[str] = []
+    mode: str = "ids"
+    list_id: str | None = None
+    if playlist and playlist.strip():
+        mode = "playlist"
+        list_id = playlist.strip()
+    elif channel and channel.strip():
+        mode = "playlist"
+        cid = channel.strip()
+        # Convert UC... channel id to uploads playlist UU...
+        if cid.startswith("UC") and len(cid) > 2:
+            list_id = "UU" + cid[2:]
+        else:
+            # fallback: use as-is; if it's already a playlist id, it will still work
+            list_id = cid
+    elif ids:
+        id_list = [s.strip() for s in ids.split(",") if s.strip()]
+        mode = "ids"
+    else:
+        return HTMLResponse(
+            "<!doctype html><html><head><meta charset='utf-8'/><meta name='viewport' content='width=device-width,initial-scale=1'/>"
+            "<title>YouTube Shorts Overlay</title><style>html,body{height:100%;margin:0;background:#000;color:#ccc;display:grid;place-items:center;font:14px/1.4 Segoe UI,Arial}</style></head>"
+            "<body><div>Missing parameter: provide <code>ids</code> or <code>playlist</code> or <code>channel</code>.</div></body></html>"
+        )
+
+    cfg = {
+        "mode": mode,
+        "ids": id_list,
+        "listId": list_id,
+        "startIndex": max(0, int(start_index)),
+        "controls": bool(controls),
+        "muted": bool(muted),
+        "loop": bool(loop),
+        "resumeOnShow": bool(resume_on_show),
+        "restore": bool(restore),
+        "embedFallback": bool(embed_fallback),
+    }
+    cfg_json = json.dumps(cfg)
+
+    # Simple embed mode (no IFrame API). Supports: single id, playlist.
+    if embed:
+        if mode == "ids" and len(id_list) >= 1:
+            vid = id_list[max(0, min(int(start_index), len(id_list) - 1))]
+            q = []
+            q.append("autoplay=1")
+            q.append(f"mute={'1' if muted else '0'}")
+            q.append("playsinline=1")
+            q.append(f"controls={'1' if controls else '0'}")
+            query = "&".join(q)
+            html = (
+                "<!doctype html><html><head><meta charset='utf-8'/><meta name='viewport' content='width=device-width,initial-scale=1'/>"
+                "<title>YouTube Shorts Overlay</title>"
+                "<style>html,body,#wrap{height:100%;width:100%;margin:0;background:#000;overflow:hidden}#wrap{display:grid;place-items:center}"
+                "#shorts{position:relative;width:100vh;max-height:100vh;aspect-ratio:9/16;background:#000}"
+                "@media (min-aspect-ratio:9/16){#shorts{height:100vh;width:calc(100vh*9/16)}}"
+                "@media (max-aspect-ratio:9/16){#shorts{width:100vw;height:calc(100vw*16/9)}}"
+                "#shorts iframe{position:absolute;inset:0;width:100%;height:100%}"
+                "</style></head><body>"
+                "<div id='wrap'><div id='shorts'>"
+                f"<iframe src='https://www.youtube.com/embed/{vid}?{query}' frameborder='0' allow='autoplay; encrypted-media; picture-in-picture' allowfullscreen></iframe>"
+                "</div></div></body></html>"
+            )
+            return HTMLResponse(content=html)
+        if mode == "playlist" and list_id:
+            q = []
+            q.append("autoplay=1")
+            q.append(f"mute={'1' if muted else '0'}")
+            q.append("playsinline=1")
+            q.append(f"controls={'1' if controls else '0'}")
+            query = "&".join(q)
+            html = (
+                "<!doctype html><html><head><meta charset='utf-8'/><meta name='viewport' content='width=device-width,initial-scale=1'/>"
+                "<title>YouTube Shorts Overlay</title>"
+                "<style>html,body,#wrap{height:100%;width:100%;margin:0;background:#000;overflow:hidden}#wrap{display:grid;place-items:center}"
+                "#shorts{position:relative;width:100vh;max-height:100vh;aspect-ratio:9/16;background:#000}"
+                "@media (min-aspect-ratio:9/16){#shorts{height:100vh;width:calc(100vh*9/16)}}"
+                "@media (max-aspect-ratio:9/16){#shorts{width:100vw;height:calc(100vw*16/9)}}"
+                "#shorts iframe{position:absolute;inset:0;width:100%;height:100%}"
+                "</style></head><body>"
+                "<div id='wrap'><div id='shorts'>"
+                f"<iframe src='https://www.youtube.com/embed/videoseries?list={list_id}&{query}' frameborder='0' allow='autoplay; encrypted-media; picture-in-picture' allowfullscreen></iframe>"
+                "</div></div></body></html>"
+            )
+            return HTMLResponse(content=html)
+
+    html = (
+        "<!doctype html><html><head><meta charset='utf-8'/><meta name='viewport' content='width=device-width,initial-scale=1'/>"
+        "<title>YouTube Shorts Overlay</title>"
+        "<style>"
+        "html,body,#wrap{height:100%;width:100%;margin:0;background:#000;overflow:hidden}"
+        "#wrap{display:grid;place-items:center}"
+        "#shorts{position:relative;width:100vh;max-height:100vh;aspect-ratio:9/16;background:#000}"
+        "@media (min-aspect-ratio:9/16){#shorts{height:100vh;width:calc(100vh*9/16)}}"
+        "@media (max-aspect-ratio:9/16){#shorts{width:100vw;height:calc(100vw*16/9)}}"
+        "#shorts iframe{position:absolute;inset:0;width:100%;height:100%}"
+        "</style></head><body>"
+        f"<script id='cfg' type='application/json'>{cfg_json}</script>"
+        "<div id='wrap'><div id='shorts'></div></div>"
+        "<script>"
+        "function getCfg(){ try{ return JSON.parse(document.getElementById('cfg').textContent||'{}'); }catch(_){ return {}; } }"
+        "const CFG = getCfg(); const IDS = Array.isArray(CFG.ids)? CFG.ids: []; const MODE = CFG.mode||'ids'; const LIST_ID = CFG.listId||null;"
+        "let index = Math.min(Math.max(0, ~~(CFG.startIndex||0)), Math.max(0, IDS.length-1));"
+        "let player; let ready=false; let lastSaved=0; let readyTimer=null; let apiLoadTimer=null;"
+        "function switchToEmbed(){ if(CFG.embedFallback!==true) return; try{ const el=document.getElementById('shorts'); const q=[]; q.push('autoplay=1'); q.push('mute='+(CFG.muted?1:0)); q.push('playsinline=1'); q.push('controls='+(CFG.controls?1:0)); const query=q.join('&'); let src=null; if(MODE==='playlist' && LIST_ID){ src='https://www.youtube.com/embed/videoseries?list='+encodeURIComponent(LIST_ID)+'&'+query; } else if(MODE==='ids'){ if(IDS.length===1){ const vid=IDS[0]; src='https://www.youtube.com/embed/'+encodeURIComponent(vid)+'?'+query; } else if(IDS.length>1){ const first=IDS[0]; const rest=IDS.slice(1).map(encodeURIComponent).join(','); const qp=[query]; if(rest){ qp.push('loop=1'); qp.push('playlist='+rest); } src='https://www.youtube.com/embed/'+encodeURIComponent(first)+'?'+qp.join('&'); } } if(!src) return; var iframe=document.createElement('iframe'); iframe.src=src; iframe.setAttribute('frameborder','0'); iframe.setAttribute('allow','autoplay; encrypted-media; picture-in-picture'); iframe.allowFullscreen=true; el.innerHTML=''; el.appendChild(iframe); }catch(_){} }"
+        "function loadYT(){ const tag=document.createElement('script'); tag.src='https://www.youtube.com/iframe_api'; tag.onerror=()=>{ try{ switchToEmbed(); }catch(_){ } }; document.head.appendChild(tag); }"
+        "function mount(id){ if(MODE!=='ids'){ return mountPlaylist(); }"
+        "  const opts={videoId:id, playerVars:{autoplay:1,controls:(CFG.controls?1:0),disablekb:0,modestbranding:1,rel:0,playsinline:1,fs:0,iv_load_policy:3,loop:(CFG.loop?1:0),playlist:(CFG.loop?id:undefined),start:0,enablejsapi:1,origin:location.origin,mute:(CFG.muted?1:0)},"
+        "    events:{onReady:(ev)=>{ ready=true; if(readyTimer){ clearTimeout(readyTimer); readyTimer=null; } try{ if(CFG.muted){ ev.target.mute(); ev.target.setVolume?.(0);} else { ev.target.unMute(); } }catch(_){}; if(CFG.restore){ try{ const t=+(localStorage.getItem('yt:'+id)||'0'); if(t>2) ev.target.seekTo(t,true);}catch(_){}} },"
+        "            onStateChange:(ev)=>{ try{ const s=ev.data; if(s===0){ next(); } }catch(_){ } },"
+        "            onError:(ev)=>{ try{ const code=ev.data; console.warn('YT error', code); if(Array.isArray(IDS) && IDS.length>1){ next(); } else { switchToEmbed(); } }catch(_){ } } } };"
+        "  player = new YT.Player('shorts', opts);"
+        "}"
+        "function mountPlaylist(){"
+        "  const opts={playerVars:{listType:'playlist', list: LIST_ID, autoplay:1, controls:(CFG.controls?1:0), disablekb:0, modestbranding:1, rel:0, playsinline:1, fs:0, iv_load_policy:3, loop:(CFG.loop?1:0), enablejsapi:1, origin:location.origin, mute:(CFG.muted?1:0)},"
+        "    events:{onReady:(ev)=>{ ready=true; if(readyTimer){ clearTimeout(readyTimer); readyTimer=null; } try{ if(CFG.muted){ ev.target.mute(); ev.target.setVolume?.(0);} else { ev.target.unMute(); } }catch(_){}; },"
+        "            onStateChange:(ev)=>{ /* YT handles next automatically in playlist mode; optional hooks here */ },"
+        "            onError:(ev)=>{ try{ const code=ev.data; console.warn('YT error', code); switchToEmbed(); }catch(_){ } } } };"
+        "  player = new YT.Player('shorts', opts);"
+        "}"
+        "function onYouTubeIframeAPIReady(){ if(apiLoadTimer){ clearTimeout(apiLoadTimer); apiLoadTimer=null; } if(MODE==='ids'){ mount(IDS[index]); } else { mountPlaylist(); } if(!readyTimer){ readyTimer = setTimeout(()=>{ if(!ready){ switchToEmbed(); } }, 2000); } }"
+        "window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;"
+        "function next(){ try{ index=(index+1)%IDS.length; player.loadVideoById(IDS[index]); }catch(_){ location.href = location.pathname + '?ids='+encodeURIComponent(IDS.join(','))+'&start_index='+index; } }"
+        "document.addEventListener('visibilitychange',()=>{ if(!player||!ready) return; try{ if(document.hidden){player.pauseVideo();} else if(CFG.resumeOnShow){player.playVideo();} }catch(_){ } });"
+        "setInterval(()=>{ if(!player||!ready) return; try{ const t=Math.floor(player.getCurrentTime?.()||0); if(!Number.isFinite(t)) return; if(Math.abs(t-lastSaved)>=2){ localStorage.setItem('yt:'+IDS[index],String(t)); lastSaved=t; } }catch(_){ } },2000);"
+        "// Overlay WS control: pause/resume/next/mute"
+        "let sock; function connect(){ try{ sock=new WebSocket(location.origin.replace(/^http/,'ws')+'/overlay/ws'); }catch(e){ setTimeout(connect,1000); return; }"
+        "sock.onclose=()=>setTimeout(connect,1000);"
+        "sock.onmessage=(ev)=>{ try{ const data=JSON.parse(ev.data); if(data?.type==='overlay_control'){ const a=(data.action||'').toLowerCase(); if(a==='pause'||a==='stop'){ try{ player?.pauseVideo?.(); }catch(_){} } else if(a==='resume'){ try{ player?.playVideo?.(); }catch(_){} } else if(a==='next'){ try{ next(); }catch(_){} } else if(a==='mute'){ try{ player?.mute?.(); player?.setVolume?.(0);}catch(_){} } else if(a==='unmute'){ try{ player?.unMute?.(); }catch(_){} } } }catch(_){ } }; }"
+        "connect();"
+        "apiLoadTimer = setTimeout(()=>{ try{ if(!ready){ switchToEmbed(); } }catch(_){ } }, 2000);"
+        "loadYT();"
         "</script></body></html>"
     )
     return HTMLResponse(content=html)
