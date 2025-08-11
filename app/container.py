@@ -15,6 +15,8 @@ from app.application.use_cases.obs_use_cases import (
     ToggleStream,
 )
 from app.application.use_cases.toast_use_cases import ToastSuccess, ToastInfo, ToastError, ToastWarning
+from app.application.use_cases.hotkeys_config_use_cases import GetHotkeysConfig, SaveHotkeysConfig
+from app.infrastructure.config.hotkeys_config import FileHotkeysConfigRepository
 from app.application.use_cases.camera_use_cases import (
     ListCameraDevices,
     GetCameraConfig,
@@ -100,3 +102,19 @@ def toast_warning() -> ToastWarning:
 @lru_cache(maxsize=None)
 def toast_error() -> ToastError:
     return ToastError(svc=notification_service())
+
+
+# Hotkeys config use-cases
+@lru_cache(maxsize=1)
+def hotkeys_repo() -> FileHotkeysConfigRepository:
+    return FileHotkeysConfigRepository()
+
+
+@lru_cache(maxsize=None)
+def get_hotkeys_config() -> GetHotkeysConfig:
+    return GetHotkeysConfig(repo=hotkeys_repo())
+
+
+@lru_cache(maxsize=None)
+def save_hotkeys_config() -> SaveHotkeysConfig:
+    return SaveHotkeysConfig(repo=hotkeys_repo())

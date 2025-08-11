@@ -9,6 +9,7 @@ from app.infrastructure.logging_setup import init_logging
 from app.presentation.api.routes import router as api_router
 from app.presentation.api.camera_routes import router as camera_router
 from app.presentation.api.overlay_routes import router as overlay_router
+from app.presentation.api.settings_routes import router as settings_router
 from app.hotkeys import hotkeys
 from typing import Optional
 import asyncio
@@ -39,6 +40,7 @@ def create_app() -> FastAPI:
     app.include_router(api_router)
     app.include_router(camera_router)
     app.include_router(overlay_router)
+    app.include_router(settings_router)
 
     # Prometheus metrics (/metrics) + psutil system/process gauges
     setup_metrics(app)
@@ -91,13 +93,11 @@ async def _startup() -> None:
     try:
         global _ret_stop_event, _ret_task
         # Collect screenshot roots from hotkey defaults and env
-        ss_dir = getattr(hotkeys, "ss_dir", None)
+        from app.config import settings as _settings
         paths: list[str] = []
-        if ss_dir is not None:
-            paths.append(str(Path(ss_dir)))
-        env_dir = os.getenv("SCREENSHOT_DIR")
-        if env_dir:
-            paths.append(env_dir)
+        # unified: settings.screenshot_dir is the single source of truth
+        if getattr(_settings, "screenshot_dir", None):
+            paths.append(str(_settings.screenshot_dir))
         # Deduplicate
         paths = sorted({p for p in paths if p})
         if paths:

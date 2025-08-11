@@ -14,7 +14,10 @@ except Exception:
     _KEYBOARD_AVAILABLE = False
 
 from .obs_client import obs_manager
+from app.config import settings
 from app.container import toast_success, toast_error, toast_warning
+from app.utils.screenshot import build_screenshot_path
+from app.container import get_hotkeys_config as uc_get_hotkeys_config
 
 
 class HotkeyManager:
@@ -22,65 +25,113 @@ class HotkeyManager:
         self._log = logging.getLogger(__name__)
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
+        self._registered: list[int | str] = []
 
-        # Single-action fallbacks (canonical defaults)
-        self.scene_key = os.getenv("HOTKEY_SCENE_KEY", "F10")
-        self.scene_name = os.getenv("HOTKEY_SCENE_NAME", "Home")
-
-        self.ss_key = os.getenv("HOTKEY_SCREENSHOT_KEY", "F5")
-        self.ss_source = os.getenv("HOTKEY_SCREENSHOT_SOURCE", "cam_front")
-        self.ss_dir = Path(os.getenv("SCREENSHOT_DIR", str(Path.home() / "Pictures" / "OBS-Screenshots")))
+        # Load JSON config for hotkeys via use-case
+        self._apply_config(self._load_config())
+        # Unified screenshot root from settings (env SCREENSHOT_DIR still respected by settings)
+        self.ss_dir = Path(getattr(settings, "screenshot_dir", str(Path.home() / "Pictures" / "OBS-Screenshots")))
         # 날짜별 폴더 분할 옵션
         self.ss_split_by_date = os.getenv("SCREENSHOT_SPLIT_BY_DATE", "1").strip() not in {"0", "false", "False"}
         self.ss_format = os.getenv("SCREENSHOT_FORMAT", "png")
         self.ss_width = int(os.getenv("SCREENSHOT_WIDTH", "1080"))
         self.ss_height = int(os.getenv("SCREENSHOT_HEIGHT", "1920"))
-        # 기본 업데이트 입력(프론트용)
-        self.ss_update_input = os.getenv("SCREENSHOT_UPDATE_INPUT", "img_before_front")
+        # 기본 업데이트 입력(프론트용) will be set by _apply_config
 
-        # After-shot (시술 후) 기본값
-        self.ss_after_key = os.getenv("HOTKEY_SCREENSHOT_AFTER_KEY", "shift+F5")
-        self.ss_after_source = os.getenv("HOTKEY_SCREENSHOT_AFTER_SOURCE", "cam_front")
-        self.ss_after_update_input = os.getenv("SCREENSHOT_UPDATE_INPUT_AFTER", "img_after_front")
+        # After-shot (시술 후) will be set by _apply_config
 
-        self.ss_side_key = os.getenv("HOTKEY_SCREENSHOT_SIDE_KEY", "F6")
-        self.ss_side_source = os.getenv("HOTKEY_SCREENSHOT_SIDE_SOURCE", "cam_side")
-        self.ss_side_update_input = os.getenv("SCREENSHOT_UPDATE_INPUT_SIDE", "img_before_side")
+        # Side will be set by _apply_config
 
-        # After-shot side
-        self.ss_side_after_key = os.getenv("HOTKEY_SCREENSHOT_SIDE_AFTER_KEY", "shift+F6")
-        self.ss_side_after_source = os.getenv("HOTKEY_SCREENSHOT_SIDE_AFTER_SOURCE", "cam_side")
-        self.ss_side_after_update_input = os.getenv("SCREENSHOT_UPDATE_INPUT_SIDE_AFTER", "img_after_side")
+        # After-shot side set by _apply_config
 
-        self.ss_rear_key = os.getenv("HOTKEY_SCREENSHOT_REAR_KEY", "F7")
-        self.ss_rear_source = os.getenv("HOTKEY_SCREENSHOT_REAR_SOURCE", "cam_rear")
-        self.ss_rear_update_input = os.getenv("SCREENSHOT_UPDATE_INPUT_REAR", "img_before_rear")
+        # Rear set by _apply_config
 
-        # After-shot rear
-        self.ss_rear_after_key = os.getenv("HOTKEY_SCREENSHOT_REAR_AFTER_KEY", "shift+F7")
-        self.ss_rear_after_source = os.getenv("HOTKEY_SCREENSHOT_REAR_AFTER_SOURCE", "cam_rear")
-        self.ss_rear_after_update_input = os.getenv("SCREENSHOT_UPDATE_INPUT_REAR_AFTER", "img_after_rear")
+        # After-shot rear set by _apply_config
 
-        # Hair reference: window_capture -> img_hair_reference
-        self.ss_hair_key = os.getenv("HOTKEY_SCREENSHOT_HAIR_KEY", "F8")
-        self.ss_hair_source = os.getenv("HOTKEY_SCREENSHOT_HAIR_SOURCE", "window_capture")
-        self.ss_hair_update_input = os.getenv("SCREENSHOT_UPDATE_HAIR_INPUT", "img_hair_reference")
+        # Hair config will be set by _apply_config
 
-        # Reset all image inputs (clear file paths)
-        self.img_reset_key = os.getenv("HOTKEY_IMG_RESET_KEY", "ctrl+F8")
-        self.img_reset_targets = os.getenv(
-            "IMG_RESET_TARGETS",
-            "img_before_front,img_after_front,img_before_side,img_after_side,img_before_rear,img_after_rear,img_hair_reference",
-        )
-        self.img_reset_confirm_window_sec = int(os.getenv("IMG_RESET_CONFIRM_WINDOW_SEC", "5"))
+        # Reset config will be set by _apply_config
         self._img_reset_armed_at: float | None = None
 
-        self.stream_toggle_key = os.getenv("HOTKEY_STREAM_TOGGLE_KEY", "F9")
+        # Stream toggle set by _apply_config
 
-        self.scene_map = self._parse_map_env("HOTKEY_SCENE_MAP")
-        self.screenshot_map = self._parse_map_env("HOTKEY_SCREENSHOT_MAP")
+        # Maps set by _apply_config
 
-        self._registered: list[int | str] = []
+    def _load_config(self) -> dict:
+        try:
+            return uc_get_hotkeys_config()()
+        except Exception:
+            return {}
+
+    def _apply_config(self, _cfg: dict) -> None:
+        # scene: no global default; optional if provided
+        self.scene_key = str((_cfg.get("scene") or {}).get("key", ""))
+        self.scene_name = str((_cfg.get("scene") or {}).get("name", ""))
+
+        sc = (_cfg.get("screenshot") or {})
+        pb = (sc.get("procedure_before") or {})
+        pa = (sc.get("procedure_after") or {})
+
+        d = (pb.get("front") or {})
+        self.ss_key = str(d.get("key", "F5"))
+        self.ss_source = str(d.get("source", "cam_front"))
+        self.ss_update_input = str(d.get("update_input", "img_before_front"))
+
+        s = (pb.get("side") or {})
+        self.ss_side_key = str(s.get("key", "F6"))
+        self.ss_side_source = str(s.get("source", "cam_side"))
+        self.ss_side_update_input = str(s.get("update_input", "img_before_side"))
+
+        r = (pb.get("rear") or {})
+        self.ss_rear_key = str(r.get("key", "F7"))
+        self.ss_rear_source = str(r.get("source", "cam_rear"))
+        self.ss_rear_update_input = str(r.get("update_input", "img_before_rear"))
+
+        af = (pa.get("front") or {})
+        self.ss_after_key = str(af.get("key", "shift+F5"))
+        self.ss_after_source = str(af.get("source", "cam_front"))
+        self.ss_after_update_input = str(af.get("update_input", "img_after_front"))
+
+        sa = (pa.get("side") or {})
+        self.ss_side_after_key = str(sa.get("key", "shift+F6"))
+        self.ss_side_after_source = str(sa.get("source", "cam_side"))
+        self.ss_side_after_update_input = str(sa.get("update_input", "img_after_side"))
+
+        ra = (pa.get("rear") or {})
+        self.ss_rear_after_key = str(ra.get("key", "shift+F7"))
+        self.ss_rear_after_source = str(ra.get("source", "cam_rear"))
+        self.ss_rear_after_update_input = str(ra.get("update_input", "img_after_rear"))
+
+        h = (sc.get("hair_reference") or {})
+        self.ss_hair_key = str(h.get("key", "F8"))
+        self.ss_hair_source = str(h.get("source", "window_capture"))
+        self.ss_hair_update_input = str(h.get("update_input", "img_hair_reference"))
+        self.ss_hair_width = int(str(h.get("width", 1920)))
+        self.ss_hair_height = int(str(h.get("height", 1080)))
+
+        imr = (_cfg.get("img_reset") or {})
+        self.img_reset_key = str(imr.get("key", "ctrl+F8"))
+        self.img_reset_targets = str(
+            imr.get(
+                "targets",
+                "img_before_front,img_after_front,img_before_side,img_after_side,img_before_rear,img_after_rear,img_hair_reference",
+            )
+        )
+        self.img_reset_confirm_window_sec = int(str(imr.get("confirm_window_sec", 5)))
+
+        self.stream_toggle_key = str(_cfg.get("stream_toggle_key", "F9"))
+        self.scene_map = (_cfg.get("scene_map") or {})
+        self.screenshot_map = (_cfg.get("screenshot_map") or {})
+
+    def reload_config(self) -> None:
+        # Stop listener, re-apply config, and restart
+        was_alive = bool(self._thread and self._thread.is_alive())
+        self.stop()
+        self._apply_config(self._load_config())
+        if was_alive:
+            self.start()
+
+        # _registered initialized in __init__
 
     @staticmethod
     def _parse_map_env(var_name: str) -> dict[str, str]:
@@ -119,6 +170,15 @@ class HotkeyManager:
                     keyboard.remove_hotkey(hk)
         except Exception:
             pass
+        # Ensure listener thread fully stops before returning to allow immediate restart
+        try:
+            if self._thread and self._thread.is_alive():
+                self._thread.join(timeout=1.0)
+        except Exception:
+            pass
+        # Reset state
+        self._registered.clear()
+        self._thread = None
         self._log.info("hotkeys listener stopped")
 
     def _run(self) -> None:
@@ -129,12 +189,24 @@ class HotkeyManager:
             pass
 
         self._log.info("hotkeys listener starting")
-        # Scene map registrations
-        for key_combo, scene in self.scene_map.items():
-            self._registered.append(
-                keyboard.add_hotkey(key_combo, lambda s=scene: keyboard.call_later(lambda: self._switch_scene_name(s)))
-            )
-            self._log.info("bind %s -> scene '%s'", key_combo, scene)
+        # Scene map registrations (from config maps + explicit scene_hotkeys)
+        sc_map = dict(self.scene_map)
+        try:
+            cfg = self._load_config()
+            for scene_name, key_combo in (cfg.get("scene_hotkeys") or {}).items():
+                kc = str(key_combo or '').strip()
+                if kc:
+                    sc_map[kc] = str(scene_name)
+        except Exception:
+            pass
+        for key_combo, scene in sc_map.items():
+            try:
+                self._registered.append(
+                    keyboard.add_hotkey(key_combo, lambda s=scene: keyboard.call_later(lambda: self._switch_scene_name(s)))
+                )
+                self._log.info("bind %s -> scene '%s'", key_combo, scene)
+            except Exception as exc:
+                self._log.warning("failed bind for scene hotkey %s -> %s: %s", key_combo, scene, exc)
 
         # Screenshot map registrations (generic)
         for key_combo, source in self.screenshot_map.items():
@@ -297,27 +369,29 @@ class HotkeyManager:
         self._take_screenshot_source_custom(source_name, self.ss_update_input)
 
     def _take_screenshot_source_custom(self, source_name: str, update_input: str | None):
-        now = datetime.now()
-        ts = now.strftime("%Y%m%d_%H%M%S")
-        safe_source = re.sub(r"[^A-Za-z0-9._-]+", "_", source_name)
-        target_dir = self.ss_dir
-        if self.ss_split_by_date:
-            target_dir = target_dir / now.strftime("%Y") / now.strftime("%m") / now.strftime("%d")
-        try:
-            target_dir.mkdir(parents=True, exist_ok=True)
-        except Exception:
-            pass
-        out = target_dir / f"{ts}_{safe_source}.{self.ss_format}"
+        out_str = build_screenshot_path(
+            source_name,
+            image_format=self.ss_format,
+            base_dir=self.ss_dir,
+            split_by_date=self.ss_split_by_date,
+        )
+        out = Path(out_str)
         import asyncio
         try:
             self._log.info("screenshot request: %s -> %s", source_name, out)
+            # 소스별 해상도: window_capture(헤어)만 1920x1080 기본
+            w = self.ss_width
+            h = self.ss_height
+            if source_name == self.ss_hair_source:
+                w = self.ss_hair_width
+                h = self.ss_hair_height
             saved = asyncio.run(
                 obs_manager.save_source_screenshot(
                     source_name=source_name,
                     image_file_path=str(out),
                     image_format=self.ss_format,
-                    image_width=self.ss_width,
-                    image_height=self.ss_height,
+                    image_width=w,
+                    image_height=h,
                 )
             )
             self._log.info("screenshot saved: %s", saved)

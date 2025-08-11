@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pathlib import Path
 
 
 class Settings(BaseSettings):
@@ -59,6 +60,9 @@ class Settings(BaseSettings):
     overlay_brand: str = "MIRRORLESS"  # env: OVERLAY_BRAND
     overlay_clock_enabled: bool = True  # env: OVERLAY_CLOCK_ENABLED
     overlay_brand_color: str = "#ffffff"  # env: OVERLAY_BRAND_COLOR
+
+    # Screenshot root directory (unified location)
+    screenshot_dir: str = str(Path.home() / "Pictures" / "OBS-Screenshots")
 
     class Config:
         env_file = ".env"

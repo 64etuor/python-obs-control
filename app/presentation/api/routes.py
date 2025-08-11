@@ -13,6 +13,7 @@ from app.container import (
 )
 from app.utils.screenshot import build_screenshot_path
 from app.config import settings
+from app.container import get_hotkeys_config as uc_get_hotkeys_config, save_hotkeys_config as uc_save_hotkeys_config
 from app.hotkeys import hotkeys
 from app.obs_client import obs_manager
 import logging
@@ -23,6 +24,7 @@ from datetime import datetime
 import sys
 import threading
 import traceback
+from app.infrastructure.obs.bootstrap import STANDARD_SCENES
 
 router = APIRouter(prefix="/api")
 
@@ -30,6 +32,40 @@ router = APIRouter(prefix="/api")
 @router.get("/health")
 async def health() -> dict:
     return {"status": "ok"}
+
+
+@router.get("/hotkeys/scenes")
+async def hotkeys_scenes() -> dict:
+    names = set(STANDARD_SCENES)
+    try:
+        data = await obs_manager.get_scenes()
+        for s in data:
+            nm = s.get("sceneName") or s.get("name")
+            if nm:
+                names.add(str(nm))
+    except Exception:
+        pass
+    return {"scenes": sorted(names)}
+
+
+@router.get("/hotkeys")
+async def get_hotkeys() -> dict:
+    data = uc_get_hotkeys_config()()
+    return {"hotkeys": data}
+
+
+@router.post("/hotkeys")
+async def set_hotkeys(payload: dict) -> dict:
+    try:
+        uc_save_hotkeys_config()(payload or {})
+        try:
+            # Attempt to hot-reload hotkeys without server restart
+            hotkeys.reload_config()
+        except Exception:
+            pass
+        return {"ok": True}
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.get("/obs/version")
@@ -69,6 +105,13 @@ async def take_screenshot(
     image_input_update: str | None = None,
 ) -> dict:
     try:
+        # If client passed a relative path, anchor it under unified screenshot root
+        from pathlib import Path as _P
+        p = _P(image_file_path)
+        if not p.is_absolute():
+            root = _P(str(settings.screenshot_dir)) if getattr(settings, "screenshot_dir", None) else _P.cwd()
+            image_file_path = str(root / p)
+
         result = await uc_take_screenshot()(
             source_name=source_name,
             image_file_path=image_file_path,
@@ -286,7 +329,10 @@ def _ensure_ring_handler() -> None:
 
 def _check_diag_token(x_diag_token: str | None) -> None:
     token = settings.diag_token
-    if token and (not x_diag_token or x_diag_token != token):
+    # Require token to be configured and provided
+    if not token:
+        raise HTTPException(status_code=401, detail="diagnostics disabled (token required)")
+    if x_diag_token != token:
         raise HTTPException(status_code=401, detail="invalid diagnostics token")
 
 

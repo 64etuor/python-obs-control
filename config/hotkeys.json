@@ -1,0 +1,70 @@
+{
+  "scene_hotkeys": {
+    "Home": "F10",
+    "ReferenceSearch": "F11",
+    "LiveFront": "ctrl+1",
+    "LiveSide": "ctrl+2",
+    "LiveRear": "ctrl+3",
+    "LiveThreeWay": "ctrl+4",
+    "ProcedureBeforeFront": "alt+1",
+    "ProcedureBeforeSide": "alt+2",
+    "ProcedureBeforeRear": "alt+3",
+    "ProcedureAfterFront": "alt+shift+1",
+    "ProcedureAfterSide": "alt+shift+2",
+    "ProcedureAfterRear": "alt+shift+3",
+    "Relax": "F12",
+    "Reels": "ctrl+F12",
+    "YouTube": "shift+F12"
+  },
+  "screenshot": {
+    "procedure_before": {
+      "front": {
+        "key": "F5",
+        "source": "cam_front",
+        "update_input": "img_before_front"
+      },
+      "side": {
+        "key": "F6",
+        "source": "cam_side",
+        "update_input": "img_before_side"
+      },
+      "rear": {
+        "key": "F7",
+        "source": "cam_rear",
+        "update_input": "img_before_rear"
+      }
+    },
+    "procedure_after": {
+      "front": {
+        "key": "shift+F5",
+        "source": "cam_front",
+        "update_input": "img_after_front"
+      },
+      "side": {
+        "key": "shift+F6",
+        "source": "cam_side",
+        "update_input": "img_after_side"
+      },
+      "rear": {
+        "key": "shift+F7",
+        "source": "cam_rear",
+        "update_input": "img_after_rear"
+      }
+    },
+    "hair_reference": {
+      "key": "F8",
+      "source": "window_capture",
+      "update_input": "img_hair_reference",
+      "width": 1920,
+      "height": 1080
+    }
+  },
+  "img_reset": {
+    "key": "ctrl+F8",
+    "targets": "img_before_front,img_after_front,img_before_side,img_after_side,img_before_rear,img_after_rear,img_hair_reference",
+    "confirm_window_sec": 5
+  },
+  "stream_toggle_key": "F9",
+  "scene_map": {},
+  "screenshot_map": {}
+}

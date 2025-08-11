@@ -14,7 +14,14 @@ def build_screenshot_path(
     split_by_date: bool = True,
 ) -> str:
     if base_dir is None:
-        base_dir = os.getenv("SCREENSHOT_DIR", str(Path.home() / "Pictures" / "OBS-Screenshots"))
+        try:
+            from app.config import settings  # lazy import to avoid cycles during startup
+
+            base_dir = getattr(settings, "screenshot_dir", None) or os.getenv(
+                "SCREENSHOT_DIR", str(Path.home() / "Pictures" / "OBS-Screenshots")
+            )
+        except Exception:
+            base_dir = os.getenv("SCREENSHOT_DIR", str(Path.home() / "Pictures" / "OBS-Screenshots"))
     now = datetime.now()
     target_dir = Path(base_dir)
     if split_by_date:

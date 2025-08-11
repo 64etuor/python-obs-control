@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Form
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from app.container import list_camera_devices, get_camera_config, apply_camera_config
 from app.infrastructure.obs.camera_config import list_dshow_devices_via_obs
@@ -41,6 +41,7 @@ async def config_set(
 
 @router.get("/ui", response_class=HTMLResponse)
 async def camera_ui() -> HTMLResponse:
+    return HTMLResponse(content="<!doctype html><html><body><div style='font-family:Segoe UI,Arial;padding:14px'>Deprecated. Use <a href='/settings/ui'>/settings/ui</a></div></body></html>")
     html = """<!doctype html><html><head><meta charset='utf-8'/><title>Camera Setup</title>
 <style>
 body{font-family:Segoe UI,Arial;margin:20px}

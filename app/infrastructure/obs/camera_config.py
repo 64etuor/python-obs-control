@@ -284,17 +284,24 @@ async def set_camera_config(front: Optional[str] = None, side: Optional[str] = N
             if cleaned:
                 resolved = cleaned
         # Apply with strong preference for moniker id first, then name
+        import re as _re2
+        friendly = _re2.sub(r"\s*\([^)]*\)\s*$", "", str(resolved)).strip()
+
         payloads = []
         if _looks_like_moniker(resolved):
+            # First, try with pure moniker values
             payloads.extend([
                 {"device_id": resolved},
                 {"video_device_id": resolved},
-                {"device_id": resolved, "device_name": friendly},
-                {"video_device_id": resolved, "device_name": friendly},
             ])
+            # If we have a friendly name, also try pairing it with moniker
+            if friendly:
+                payloads.extend([
+                    {"device_id": resolved, "device_name": friendly},
+                    {"video_device_id": resolved, "device_name": friendly},
+                ])
+
         # Always include a stripped friendly name attempt as well
-        import re as _re2
-        friendly = _re2.sub(r"\s*\([^)]*\)\s*$", "", str(resolved)).strip()
         if friendly:
             payloads.extend([
                 {"device_name": friendly},

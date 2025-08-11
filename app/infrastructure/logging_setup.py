@@ -39,6 +39,9 @@ _STANDARD_LOG_KEYS = {
 }
 
 
+_LOGGING_INITIALIZED = False
+
+
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         # Respect settings.log_utc for timestamp timezone
@@ -88,6 +91,9 @@ def _apply_formatter_to_logger(logger_name: str, formatter: logging.Formatter) -
 
 
 def init_logging() -> None:
+    global _LOGGING_INITIALIZED
+    if _LOGGING_INITIALIZED:
+        return
     level_name = settings.log_level.upper()
     level = getattr(logging, level_name, logging.INFO)
 
@@ -106,17 +112,22 @@ def init_logging() -> None:
         text_formatter.converter = _time.localtime  # type: ignore[attr-defined]
     json_formatter: logging.Formatter = JsonFormatter()
 
-    # Stream handler (console)
-    has_stream = any(isinstance(h, logging.StreamHandler) for h in root.handlers)
-    if not has_stream:
+    # Stream handler (console) — ensure exactly one
+    stream_handlers = [h for h in root.handlers if isinstance(h, logging.StreamHandler)]
+    if not stream_handlers:
         sh = logging.StreamHandler()
         sh.setLevel(level)
         sh.setFormatter(text_formatter)
         root.addHandler(sh)
     else:
-        for h in root.handlers:
-            if isinstance(h, logging.StreamHandler):
-                h.setFormatter(text_formatter)
+        # Keep the first, standardize formatter, remove duplicates to avoid double logs
+        primary = stream_handlers[0]
+        primary.setFormatter(text_formatter)
+        for h in stream_handlers[1:]:
+            try:
+                root.removeHandler(h)
+            except Exception:
+                pass
 
     # File handler (JSON)
     if settings.log_file_enabled:
@@ -128,7 +139,10 @@ def init_logging() -> None:
         log_path = log_dir / settings.log_file_name
 
         def is_same_file_handler(handler: Handler) -> bool:
-            return isinstance(handler, RotatingFileHandler) and getattr(handler, "baseFilename", None) == os.fspath(log_path)
+            return (
+                getattr(handler, "baseFilename", None) == os.fspath(log_path)
+                and isinstance(handler, (RotatingFileHandler, TimedRotatingFileHandler))
+            )
 
         if not any(is_same_file_handler(h) for h in root.handlers):
             if getattr(settings, "log_rotation", "size").lower() == "time":
@@ -189,5 +203,7 @@ def init_logging() -> None:
     _apply_formatter_to_logger("uvicorn", text_formatter)
     _apply_formatter_to_logger("uvicorn.error", text_formatter)
     _apply_formatter_to_logger("uvicorn.access", text_formatter)
+
+    _LOGGING_INITIALIZED = True
 
 

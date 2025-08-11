@@ -96,8 +96,10 @@ def launch_obs() -> None:
     resolved_data = _resolve_obs_data_path(exe_dir, obs_root)
     if resolved_data is not None:
         env["OBS_DATA_PATH"] = str(resolved_data)
+        logger.info("OBS_DATA_PATH resolved to %s", env["OBS_DATA_PATH"])
     elif settings.obs_data_path:
         env["OBS_DATA_PATH"] = str(Path(settings.obs_data_path))
+        logger.info("OBS_DATA_PATH set from settings to %s", env["OBS_DATA_PATH"])
 
     try:
         # Prefer CWD at binary dir to match normal shortcuts; data path is provided via OBS_DATA_PATH

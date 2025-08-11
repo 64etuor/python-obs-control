@@ -55,7 +55,7 @@ async def ensure_scenes_exist(names: Iterable[str]) -> None:
             await obs_manager._to_thread(create, name)  # type: ignore[attr-defined]
 
 
-async def ensure_input_exists(input_name: string, kind: str) -> None:  # type: ignore[name-defined]
+async def ensure_input_exists(input_name: str, kind: str) -> None:
     client = await obs_manager.connect()
     get = getattr(client, "get_input_list", None)
     add = getattr(client, "create_input", None)
