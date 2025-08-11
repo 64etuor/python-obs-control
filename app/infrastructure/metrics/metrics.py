@@ -43,9 +43,10 @@ GAUGE_PROC_VMS_BYTES = Gauge(
     "process_memory_vms_bytes",
     "Current process Virtual Memory Size in bytes",
 )
-GAUGE_OPEN_FDS = Gauge(
-    "process_open_fds",
-    "Number of open file descriptors/handles for the process (Windows counts handles)",
+# Avoid clashing with default `process_open_fds` from prometheus_client PROCESS_COLLECTOR
+GAUGE_OPEN_HANDLES = Gauge(
+    "app_process_open_handles",
+    "Number of open file descriptors/handles for this process (Windows counts handles)",
 )
 
 
@@ -71,12 +72,12 @@ def _sample_metrics_loop(poll_seconds: float = 2.0) -> None:
             GAUGE_PROC_RSS_BYTES.set(mem_info.rss)
             GAUGE_PROC_VMS_BYTES.set(mem_info.vms)
 
-            # Open fds/handles
+            # Open fds/handles (custom metric name to avoid collision with default collectors)
             try:
                 if hasattr(_PROCESS, "num_handles"):
-                    GAUGE_OPEN_FDS.set(_PROCESS.num_handles())  # Windows
+                    GAUGE_OPEN_HANDLES.set(_PROCESS.num_handles())  # Windows
                 else:
-                    GAUGE_OPEN_FDS.set(_PROCESS.num_fds())  # POSIX
+                    GAUGE_OPEN_HANDLES.set(_PROCESS.num_fds())  # POSIX
             except Exception:
                 # Some platforms may not support it; keep metric but skip update
                 pass
