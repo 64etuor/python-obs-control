@@ -1,0 +1,29 @@
+metricbeat.modules:
+  - module: prometheus
+    period: 15s
+    hosts:
+      - "http://host.docker.internal:8080"
+    metrics_path: /metrics
+    # keep label names and numeric types where possible
+    use_types: true
+    rate_counters: true
+    # convert histogram buckets
+    enable_metadata: true
+
+processors:
+  - add_fields:
+      target: ''
+      fields:
+        app: ${APP_NAME:obs-ws-server}
+        environment: ${ENV:dev}
+
+setup.kibana:
+  host: "http://kibana:5601"
+setup.ilm.enabled: false
+
+output.elasticsearch:
+  hosts: ["http://elasticsearch:9200"]
+
+logging.level: info
+logging.to_files: false
+logging.to_stderr: true

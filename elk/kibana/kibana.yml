@@ -1,0 +1,5 @@
+vis_type_vega.enabled: true
+vis_type_vega.enableExternalUrls: true
+server.host: "0.0.0.0"
+server.port: 5601
+server.publicBaseUrl: "http://localhost:5601"

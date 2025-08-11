@@ -1,0 +1,48 @@
+filebeat.inputs:
+  - type: filestream
+    id: python-obs-json
+    enabled: true
+    paths:
+      - /logs/**/*.log
+    parsers:
+      - ndjson:
+          overwrite_keys: true
+          add_error_key: true
+          expand_keys: true
+
+processors:
+  - add_fields:
+      target: ''
+      fields:
+        app: ${APP_NAME:obs-ws-server}
+        environment: ${ENV:dev}
+  - timestamp:
+      field: time
+      layouts:
+        - ISO8601
+      timezone: UTC
+  - rename:
+      fields:
+        - from: level
+          to: log.level
+        - from: service
+          to: service.name
+        - from: host
+          to: host.name
+      ignore_missing: true
+
+setup.template.enabled: true
+setup.template.name: "python-obs-control"
+setup.template.pattern: "python-obs-control-*"
+setup.ilm.enabled: false
+setup.kibana:
+  host: "http://kibana:5601"
+setup.dashboards.enabled: false
+
+output.elasticsearch:
+  hosts: ["http://elasticsearch:9200"]
+  index: "python-obs-control-%{[environment]:dev}-%{+yyyy.MM.dd}"
+
+logging.level: info
+logging.to_files: false
+logging.to_stderr: true
