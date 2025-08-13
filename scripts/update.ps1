@@ -7,8 +7,47 @@ Param(
 
 $ErrorActionPreference = "Stop"
 
+function Find-RepoRoot([string]$startDir) {
+  try {
+    $dir = (Resolve-Path $startDir).Path
+  } catch { return $null }
+  while ($true) {
+    if (Test-Path (Join-Path $dir ".git")) { return $dir }
+    $parent = Split-Path -Parent $dir
+    if (-not $parent -or $parent -eq $dir) { break }
+    $dir = $parent
+  }
+  return $null
+}
+
+# Auto-detect repo path if not provided or invalid
+if (-not $Repo -or -not (Test-Path $Repo)) {
+  $autoRepo = Find-RepoRoot $PSScriptRoot
+  if ($autoRepo) {
+    $Repo = $autoRepo
+    Write-Host "Repo auto-detected: $Repo" -ForegroundColor Cyan
+  }
+}
+
 if (!(Test-Path $Repo)) { throw "Repo not found: $Repo" }
-if (!(Test-Path $Venv)) { throw "Venv not found: $Venv (먼저 venv 만들고 requirements 설치 필요)" }
+
+# Resolve/Create venv if missing
+if (-not $Venv -or -not (Test-Path $Venv)) {
+  $Venv = Join-Path $Repo ".venv"
+}
+$pyexe = Join-Path $Venv "Scripts\python.exe"
+if (-not (Test-Path $pyexe)) {
+  Write-Host "Virtualenv not found, creating: $Venv" -ForegroundColor Yellow
+  try { New-Item -ItemType Directory -Force -Path $Venv | Out-Null } catch {}
+  $py = Get-Command py -ErrorAction SilentlyContinue
+  if ($py) {
+    & py -3 -m venv "$Venv"
+  } else {
+    & python -m venv "$Venv"
+  }
+  if (-not (Test-Path $pyexe)) { throw "Failed to create virtualenv at $Venv" }
+  try { & $pyexe -m pip install --upgrade pip setuptools wheel | Out-Null } catch {}
+}
 
 Set-Location $Repo
 
@@ -28,7 +67,6 @@ if ($Force -or $local -ne $remote) {
     exit 1
   }
   
-  # Use safer pull instead of reset --hard
   if ($Force) {
     Write-Host "Force mode: Discarding local changes..." -ForegroundColor Yellow
     git reset --hard "origin/$Branch"
@@ -36,7 +74,11 @@ if ($Force -or $local -ne $remote) {
     git pull origin $Branch
   }
   
-  & "$Venv\Scripts\python.exe" -m pip install -r "$Repo\requirements.txt"
+  if (Test-Path (Join-Path $Repo "requirements.txt")) {
+    & "$pyexe" -m pip install -r (Join-Path $Repo "requirements.txt")
+  } else {
+    Write-Host "requirements.txt not found, skipping install." -ForegroundColor Yellow
+  }
   Write-Host "Update done."
 } else {
   Write-Host "Already up-to-date: $local"
