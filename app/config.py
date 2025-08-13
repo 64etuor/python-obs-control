@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     obs_port: int = 4455
     obs_password: str = ""
     obs_heartbeat: float = 15.0
+    obs_heartbeat_fail_alert_threshold: int = 4
 
     # OBS autostart/guardian
     obs_autostart: bool = True

@@ -27,6 +27,7 @@ import threading
 import traceback
 from app.infrastructure.obs.bootstrap import STANDARD_SCENES
 from app.infrastructure.overlay.notification_service_impl import overlay_notifications
+from app.container import alert_service
 
 router = APIRouter(prefix="/api")
 
@@ -163,6 +164,13 @@ async def take_screenshot(
                     "스크린샷 실패. 저장 경로의 디렉토리가 존재하지 않습니다. 전체 경로가 유효한지 확인하세요."
                 ),
             )
+        try:
+            alert_service().notify_incident("/api/obs/screenshot failed", level="ERROR", context={
+                "exception": s,
+                "source_name": source_name,
+            })
+        except Exception:
+            pass
         raise HTTPException(status_code=500, detail=str(exc))
 
 
@@ -199,6 +207,10 @@ async def ws_reconnect() -> dict:
             pass
         return {"ok": True}
     except Exception as exc:  # noqa: BLE001
+        try:
+            alert_service().notify_incident("/api/ws/reconnect failed", level="ERROR", context={"error": str(exc)})
+        except Exception:
+            pass
         raise HTTPException(status_code=500, detail=str(exc))
 
 

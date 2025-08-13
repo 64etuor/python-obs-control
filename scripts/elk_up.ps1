@@ -9,6 +9,7 @@ Push-Location $repoRoot
 
 Write-Host "Starting ELK stack using" $ComposeFile "from" (Get-Location) "..."
 
+
 function Test-DockerAvailable {
   docker version > $null 2>&1
   return ($LASTEXITCODE -eq 0)

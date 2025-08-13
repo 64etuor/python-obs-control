@@ -22,6 +22,8 @@ class OBSConnectionManager:
         self._lock = asyncio.Lock()
         self._hb_stop: Optional[asyncio.Event] = None
         self._hb_task: Optional[asyncio.Task] = None
+        self._hb_fail_count: int = 0
+        self._hb_alerted: bool = False
 
     async def connect(self) -> ReqClient:
         async with self._lock:
@@ -82,8 +84,32 @@ class OBSConnectionManager:
                 try:
                     await self._request("get_version")
                     backoff = 1.0
+                    if self._hb_fail_count > 0:
+                        self._hb_fail_count = 0
+                        if self._hb_alerted:
+                            try:
+                                from app.container import alert_service  # lazy import
+                                alert_service().notify_incident("OBS WebSocket 연결 복구", level="INFO", context=None)
+                            except Exception:
+                                pass
+                            self._hb_alerted = False
                 except Exception as exc:  # noqa: BLE001
                     logger.warning("OBS heartbeat failed; will retry: %s", exc)
+                    self._hb_fail_count += 1
+                    from app.config import settings as _settings
+                    threshold = max(1, int(getattr(_settings, "obs_heartbeat_fail_alert_threshold", 4)))
+                    if self._hb_fail_count >= threshold and not self._hb_alerted:
+                        try:
+                            logger.error("OBS WebSocket 지속 실패(%s회)", self._hb_fail_count)
+                            from app.container import alert_service  # lazy import
+                            alert_service().notify_incident(
+                                "OBS WebSocket 지속 실패",
+                                level="ERROR",
+                                context={"fail_count": self._hb_fail_count},
+                            )
+                        except Exception:
+                            pass
+                        self._hb_alerted = True
             except Exception as exc:  # noqa: BLE001
                 logger.debug("OBS heartbeat outer error: %s", exc)
             try:

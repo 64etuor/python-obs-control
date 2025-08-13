@@ -10,6 +10,7 @@ import requests
 import json
 
 from app.config import settings
+from app.container import alert_service
 
 
 _log = logging.getLogger(__name__)
@@ -177,5 +178,9 @@ async def kibana_import_background() -> None:
         _log.info("kibana ndjson import completed")
     except Exception as exc:  # noqa: BLE001
         _log.warning("kibana import failed: %s", exc)
+        try:
+            alert_service().notify_incident("Kibana import failed", level="ERROR", context={"error": str(exc)})
+        except Exception:
+            pass
 
 
