@@ -1,8 +1,14 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
 
 
 class Settings(BaseSettings):
+    # pydantic v2: ignore unknown env vars (e.g., ENV), load from .env
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
     app_name: str = "obs-ws-server"
     host: str = "0.0.0.0"
     port: int = 8080
@@ -32,7 +38,7 @@ class Settings(BaseSettings):
     # OBS autostart/guardian
     obs_autostart: bool = True
     obs_exe_path: str | None = None
-    obs_launch_args: str = "" # "--minimize-to-tray"
+    obs_launch_args: str = "--minimize-to-tray" # "--minimize-to-tray" or ""
     obs_launch_timeout: int = 45
     obs_guardian_enabled: bool = True
     obs_guardian_interval: int = 5
@@ -50,6 +56,11 @@ class Settings(BaseSettings):
     # Auto bootstrap OBS layout on startup
     auto_bootstrap: bool = True
 
+    # ELK / Kibana
+    elk_auto_import: bool = True
+    kibana_url: str = "http://localhost:5601"
+    kibana_import_timeout_sec: int = 300
+
     # Optional diagnostics/token protection
     diag_token: str | None = None
 
@@ -63,11 +74,6 @@ class Settings(BaseSettings):
 
     # Screenshot root directory (unified location)
     screenshot_dir: str = str(Path.home() / "Pictures" / "OBS-Screenshots")
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-
 
 settings = Settings()
 

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from typing import Iterable
+from pathlib import Path
+import logging
 
 from app.obs_client import obs_manager
 
@@ -81,3 +83,55 @@ async def wire_default_layout() -> None:
     # await ensure_input_exists("img_before_front", "image_source")
     # await ensure_input_exists("img_before_side", "image_source")
     # await ensure_input_exists("img_before_rear", "image_source")
+    try:
+        await _apply_default_asset_images()
+    except Exception as exc:
+        logging.getLogger(__name__).warning("apply default asset images skipped: %s", exc)
+
+
+async def _apply_default_asset_images() -> None:
+    """
+    Ensure specific image inputs point to our repo's assets by default:
+      - img_cam_bg -> assets/image/cam-bg.png
+      - img_ba_frame -> assets/image/frame-beforeafter.png
+      - img_mac_wireframe -> assets/image/mac-wireframe.png
+
+    If inputs are missing, they will be created as image_source under 'Home' scene.
+    File paths are resolved relative to repository root to be robust regardless of CWD.
+    """
+    # Resolve repo root and assets dir robustly
+    try:
+        repo_root = Path(__file__).resolve().parents[3]
+    except Exception:
+        repo_root = Path.cwd()
+    assets_dir = repo_root / "assets" / "image"
+    if not assets_dir.exists():
+        # Fallback to CWD relative
+        assets_dir = Path("assets") / "image"
+
+    mapping: dict[str, Path] = {
+        "img_cam_bg": assets_dir / "cam-bg.png",
+        "img_ba_frame": assets_dir / "frame-beforeafter.png",
+        "img_mac_wireframe": assets_dir / "mac-wireframe.png",
+    }
+
+    client = await obs_manager.connect()
+    get_inputs = getattr(client, "get_input_list", None)
+    create_input = getattr(client, "create_input", None)
+    if get_inputs is None or create_input is None:
+        return
+    inputs = await obs_manager._to_thread(get_inputs)
+    existing = {i.get("inputName") or i.get("input_name") or i.get("name") for i in getattr(inputs, "inputs", [])}
+
+    for input_name, file_path in mapping.items():
+        try:
+            if not file_path.exists():
+                continue
+            # Create missing image_source
+            if input_name not in existing:
+                await obs_manager._to_thread(create_input, "Home", input_name, "image_source", {"file": str(file_path)}, False)
+                existing.add(input_name)
+            # Update file path
+            await obs_manager.set_input_settings(input_name, {"file": str(file_path)}, False)
+        except Exception as exc:
+            logging.getLogger(__name__).warning("failed to set asset for %s: %s", input_name, exc)

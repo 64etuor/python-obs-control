@@ -1,0 +1,110 @@
+﻿{
+    "id":  "logs_top_loggers_lens",
+    "type":  "lens",
+    "namespaces":  [
+                       "default"
+                   ],
+    "migrationVersion":  {
+                             "lens":  "8.9.0"
+                         },
+    "updated_at":  "2025-08-12T02:07:39.962Z",
+    "created_at":  "2025-08-12T02:07:39.962Z",
+    "version":  "WzExMiw3XQ==",
+    "attributes":  {
+                       "visualizationType":  "lnsXY",
+                       "title":  "Logs - Top loggers (Lens)",
+                       "state":  {
+                                     "datasourceStates":  {
+                                                              "formBased":  {
+                                                                                "layers":  {
+                                                                                               "layer-logs-top":  {
+                                                                                                                      "columns":  {
+                                                                                                                                      "x-terms":  {
+                                                                                                                                                      "dataType":  "string",
+                                                                                                                                                      "isBucketed":  true,
+                                                                                                                                                      "label":  "Top loggers",
+                                                                                                                                                      "operationType":  "terms",
+                                                                                                                                                      "params":  {
+                                                                                                                                                                     "orderBy":  {
+                                                                                                                                                                                     "type":  "column",
+                                                                                                                                                                                     "columnId":  "y-count"
+                                                                                                                                                                                 },
+                                                                                                                                                                     "orderDirection":  "desc",
+                                                                                                                                                                     "size":  10,
+                                                                                                                                                                     "otherBucket":  false,
+                                                                                                                                                                     "missingBucket":  false,
+                                                                                                                                                                     "parentFormat":  {
+                                                                                                                                                                                          "id":  "terms"
+                                                                                                                                                                                      }
+                                                                                                                                                                 },
+                                                                                                                                                      "scale":  "ordinal",
+                                                                                                                                                      "sourceField":  "logger.keyword"
+                                                                                                                                                  },
+                                                                                                                                      "y-count":  {
+                                                                                                                                                      "dataType":  "number",
+                                                                                                                                                      "isBucketed":  false,
+                                                                                                                                                      "label":  "Count of records",
+                                                                                                                                                      "operationType":  "count",
+                                                                                                                                                      "params":  {
+
+                                                                                                                                                                 },
+                                                                                                                                                      "scale":  "ratio",
+                                                                                                                                                      "sourceField":  "___records___"
+                                                                                                                                                  }
+                                                                                                                                  },
+                                                                                                                      "columnOrder":  [
+                                                                                                                                          "x-terms",
+                                                                                                                                          "y-count"
+                                                                                                                                      ],
+                                                                                                                      "incompleteColumns":  {
+
+                                                                                                                                            }
+                                                                                                                  }
+                                                                                           }
+                                                                            }
+                                                          },
+                                     "visualization":  {
+                                                           "legend":  {
+                                                                          "isVisible":  false,
+                                                                          "position":  "right",
+                                                                          "legendSize":  "auto"
+                                                                      },
+                                                           "preferredSeriesType":  "bar",
+                                                           "layers":  [
+                                                                          {
+                                                                              "layerId":  "layer-logs-top",
+                                                                              "seriesType":  "bar",
+                                                                              "xAccessor":  "x-terms",
+                                                                              "accessors":  [
+                                                                                                "y-count"
+                                                                                            ],
+                                                                              "yConfig":  [
+
+                                                                                          ],
+                                                                              "layerType":  "data"
+                                                                          }
+                                                                      ]
+                                                       },
+                                     "query":  {
+                                                   "language":  "kuery",
+                                                   "query":  ""
+                                               },
+                                     "filters":  [
+
+                                                 ]
+                                 }
+                   },
+    "references":  [
+                       {
+                           "type":  "index-pattern",
+                           "name":  "indexpattern-datasource-current-indexpattern"
+                       },
+                       {
+                           "type":  "index-pattern",
+                           "name":  "indexpattern-datasource-layer-layer-logs-top"
+                       }
+                   ],
+    "managed":  false,
+    "coreMigrationVersion":  "8.8.0",
+    "typeMigrationVersion":  "8.9.0"
+}

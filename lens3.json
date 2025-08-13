@@ -1,0 +1,101 @@
+﻿{
+    "id":  "metrics_cpu_percent_lens",
+    "type":  "lens",
+    "namespaces":  [
+                       "default"
+                   ],
+    "migrationVersion":  {
+                             "lens":  "8.9.0"
+                         },
+    "updated_at":  "2025-08-12T02:07:39.962Z",
+    "created_at":  "2025-08-12T02:07:39.962Z",
+    "version":  "WzExMyw3XQ==",
+    "attributes":  {
+                       "visualizationType":  "lnsXY",
+                       "title":  "Metrics - CPU percent (Lens)",
+                       "state":  {
+                                     "datasourceStates":  {
+                                                              "formBased":  {
+                                                                                "layers":  {
+                                                                                               "layer-metrics-cpu":  {
+                                                                                                                         "columns":  {
+                                                                                                                                         "x-time":  {
+                                                                                                                                                        "dataType":  "date",
+                                                                                                                                                        "isBucketed":  true,
+                                                                                                                                                        "label":  "@timestamp",
+                                                                                                                                                        "operationType":  "date_histogram",
+                                                                                                                                                        "params":  {
+                                                                                                                                                                       "interval":  "auto",
+                                                                                                                                                                       "includeEmptyRows":  true
+                                                                                                                                                                   },
+                                                                                                                                                        "scale":  "interval",
+                                                                                                                                                        "sourceField":  "@timestamp"
+                                                                                                                                                    },
+                                                                                                                                         "y-avg":  {
+                                                                                                                                                       "dataType":  "number",
+                                                                                                                                                       "isBucketed":  false,
+                                                                                                                                                       "label":  "avg system_cpu_percent",
+                                                                                                                                                       "operationType":  "average",
+                                                                                                                                                       "params":  {
+
+                                                                                                                                                                  },
+                                                                                                                                                       "scale":  "ratio",
+                                                                                                                                                       "sourceField":  "prometheus.system_cpu_percent.value"
+                                                                                                                                                   }
+                                                                                                                                     },
+                                                                                                                         "columnOrder":  [
+                                                                                                                                             "x-time",
+                                                                                                                                             "y-avg"
+                                                                                                                                         ],
+                                                                                                                         "incompleteColumns":  {
+
+                                                                                                                                               }
+                                                                                                                     }
+                                                                                           }
+                                                                            }
+                                                          },
+                                     "visualization":  {
+                                                           "legend":  {
+                                                                          "isVisible":  false,
+                                                                          "position":  "right",
+                                                                          "legendSize":  "auto"
+                                                                      },
+                                                           "preferredSeriesType":  "line",
+                                                           "layers":  [
+                                                                          {
+                                                                              "layerId":  "layer-metrics-cpu",
+                                                                              "seriesType":  "line",
+                                                                              "xAccessor":  "x-time",
+                                                                              "accessors":  [
+                                                                                                "y-avg"
+                                                                                            ],
+                                                                              "yConfig":  [
+
+                                                                                          ],
+                                                                              "layerType":  "data"
+                                                                          }
+                                                                      ]
+                                                       },
+                                     "query":  {
+                                                   "language":  "kuery",
+                                                   "query":  ""
+                                               },
+                                     "filters":  [
+
+                                                 ]
+                                 }
+                   },
+    "references":  [
+                       {
+                           "type":  "index-pattern",
+                           "name":  "indexpattern-datasource-current-indexpattern"
+                       },
+                       {
+                           "type":  "index-pattern",
+                           "name":  "indexpattern-datasource-layer-layer-metrics-cpu"
+                       }
+                   ],
+    "managed":  false,
+    "coreMigrationVersion":  "8.8.0",
+    "typeMigrationVersion":  "8.9.0"
+}

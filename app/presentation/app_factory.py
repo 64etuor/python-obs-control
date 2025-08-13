@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
@@ -17,6 +18,8 @@ from pathlib import Path
 import os
 
 from app.infrastructure.cleanup.screenshot_retention import retention_loop
+from app.obs_client import obs_manager
+from app.infrastructure.elk.kibana_import import kibana_import_background
 
 _guard_stop_event: Optional[asyncio.Event] = None
 _guard_task: Optional[asyncio.Task] = None
@@ -41,6 +44,14 @@ def create_app() -> FastAPI:
     app.include_router(camera_router)
     app.include_router(overlay_router)
     app.include_router(settings_router)
+
+    # Serve static assets (icons, images) at /assets
+    try:
+        assets_dir = Path(__file__).resolve().parents[2] / "assets"
+        if assets_dir.exists():
+            app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+    except Exception:
+        pass
 
     # Prometheus metrics (/metrics) + psutil system/process gauges
     setup_metrics(app)
@@ -77,6 +88,18 @@ async def _startup() -> None:
             logging.getLogger(__name__).warning("bootstrap skipped or failed: %s", exc)
 
     hotkeys.start()
+    # Start OBS heartbeat (non-blocking)
+    try:
+        obs_manager.start_heartbeat()
+    except Exception:
+        pass
+
+    # Kick off Kibana import in background (non-blocking)
+    try:
+        if settings.elk_auto_import:
+            asyncio.create_task(kibana_import_background())
+    except Exception:
+        pass
 
     # Start guardian loop to keep OBS alive
     if settings.obs_guardian_enabled and not (settings.obs_skip_autostart_in_docker and _is_running_in_docker()):
@@ -112,6 +135,10 @@ async def _shutdown() -> None:
     import logging
     logging.getLogger(__name__).info("application shutdown")
     hotkeys.stop()
+    try:
+        obs_manager.stop_heartbeat()
+    except Exception:
+        pass
     # stop guardian
     global _guard_stop_event, _guard_task
     try:
