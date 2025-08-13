@@ -1,20 +1,37 @@
 Param(
   [int]$Port = 8080,
   [string]$Bind = "0.0.0.0",
-  [switch]$NoElk
+  [switch]$NoElk,
+  [bool]$Reload = $true
 )
 
 $env:PYTHONPATH = "$PSScriptRoot"
 
+# If local virtualenv exists, prepend its Scripts to PATH so 'uvicorn' resolves
+try {
+  $venvScripts = Join-Path $PSScriptRoot ".venv"
+  $venvScripts = Join-Path $venvScripts "Scripts"
+  if (Test-Path $venvScripts) {
+    $env:PATH = "$venvScripts;$env:PATH"
+  }
+} catch {}
+
 # 1) On launch, attempt a one-shot update (git pull + pip install)
+$updateAttempted = $false
+$updateOk = $true
 try {
   $repo = "$PSScriptRoot"
   $venv = Join-Path $PSScriptRoot ".venv"
   $updateScript = Join-Path $PSScriptRoot "scripts/update.ps1"
   if ((Test-Path $updateScript -PathType Leaf) -and (Test-Path $venv)) {
     Write-Host "[run_server] Running one-shot update..." -ForegroundColor Cyan
+    $updateAttempted = $true
     $out = & powershell -NoProfile -ExecutionPolicy Bypass -File "$updateScript" -Repo "$repo" -Venv "$venv" 2>&1
     $out | ForEach-Object { Write-Host $_ }
+    if ($LASTEXITCODE -ne 0) {
+      $updateOk = $false
+      Write-Host "[run_server] Update returned non-zero exit code ($LASTEXITCODE). Will run with current code as-is." -ForegroundColor Yellow
+    }
   } else {
     Write-Host "[run_server] Skip update (missing venv or update script)." -ForegroundColor Yellow
   }
@@ -67,8 +84,38 @@ try {
     Write-Host "[run_server] ELK disabled via -NoElk switch." -ForegroundColor Yellow
   }
 
-  # 4) Start server with auto-reload
-  uvicorn app.presentation.app_factory:app --host $Bind --port $Port --reload
+  # 4) Start server (reload optional) with fallback to python -m uvicorn
+  function Invoke-Uvicorn([string]$uvHost, [int]$uvPort, [bool]$uvReload) {
+    $uvArgs = @("app.presentation.app_factory:app", "--host", $uvHost, "--port", $uvPort)
+    if ($uvReload) { $uvArgs += "--reload" }
+    $started = $false
+    try {
+      Write-Host "[run_server] Starting via 'uvicorn'..." -ForegroundColor Cyan
+      uvicorn @uvArgs
+      $started = $true
+    } catch {
+      if ($_.Exception -and ($_.Exception.GetType().Name -like "*CommandNotFound*")) {
+        Write-Host "[run_server] 'uvicorn' not found, retrying with 'python -m uvicorn'..." -ForegroundColor Yellow
+      } else {
+        Write-Host "[run_server] uvicorn start raised: $($_.Exception.Message). Retrying with 'python -m uvicorn'..." -ForegroundColor Yellow
+      }
+    }
+    if (-not $started) {
+      try {
+        python -m uvicorn @uvArgs
+        $started = $true
+      } catch {
+        Write-Host "[run_server] python -m uvicorn failed: $($_.Exception.Message)" -ForegroundColor Red
+        throw
+      }
+    }
+  }
+
+  if (-not $updateOk -and $updateAttempted) {
+    Write-Host "[run_server] Proceeding without update (using current working copy)." -ForegroundColor Yellow
+  }
+
+  Invoke-Uvicorn -uvHost $Bind -uvPort $Port -uvReload:$Reload
 }
 finally {
   if ($elkStarted) {

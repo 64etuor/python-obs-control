@@ -174,3 +174,7 @@ def _is_running_in_docker() -> bool:
     except Exception:
         pass
     return False
+
+
+def _is_running_as_service() -> bool:
+    return False

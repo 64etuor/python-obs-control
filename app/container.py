@@ -4,7 +4,9 @@ from functools import lru_cache
 
 from app.infrastructure.obs.obs_service_impl import ObsService
 from app.infrastructure.overlay.notification_service_impl import overlay_notifications
+from app.infrastructure.overlay.discord_alert_service import DiscordAlertService
 from app.domain.ports.notification_service import INotificationService
+from app.domain.ports.alert_service import IAlertService
 from app.application.use_cases.obs_use_cases import (
     GetObsVersion,
     ListScenes,
@@ -32,6 +34,11 @@ def obs_service() -> ObsService:
 @lru_cache(maxsize=1)
 def notification_service() -> INotificationService:
     return overlay_notifications
+
+
+@lru_cache(maxsize=1)
+def alert_service() -> IAlertService:
+    return DiscordAlertService()
 
 @lru_cache(maxsize=None)
 def get_obs_version() -> GetObsVersion:

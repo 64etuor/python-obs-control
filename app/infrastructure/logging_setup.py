@@ -13,6 +13,7 @@ import socket
 import shutil
 
 from app.config import settings
+from app.container import alert_service
 
 
 _STANDARD_LOG_KEYS = {
@@ -204,5 +205,28 @@ def init_logging() -> None:
     _apply_formatter_to_logger("uvicorn.access", text_formatter)
 
     _LOGGING_INITIALIZED = True
+
+    # Hook: critical/error log forwarding to alerting (Discord) via a lightweight handler
+    try:
+        class _AlertHandler(logging.Handler):
+            def emit(self, record: logging.LogRecord) -> None:
+                try:
+                    lvl = record.levelno
+                    if lvl >= logging.ERROR:
+                        msg = self.format(record)
+                        extra_ctx = {
+                            "logger": record.name,
+                            "level": record.levelname,
+                            "file": f"{record.filename}:{record.lineno}",
+                        }
+                        alert_service().notify_incident(msg, level=record.levelname, context=extra_ctx)
+                except Exception:
+                    pass
+
+        ah = _AlertHandler(level=logging.ERROR)
+        ah.setFormatter(text_formatter)
+        root.addHandler(ah)
+    except Exception:
+        pass
 
 
