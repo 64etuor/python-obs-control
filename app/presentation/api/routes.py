@@ -16,6 +16,7 @@ from app.config import settings
 from app.container import get_hotkeys_config as uc_get_hotkeys_config, save_hotkeys_config as uc_save_hotkeys_config
 from app.hotkeys import hotkeys
 from app.obs_client import obs_manager
+from app.infrastructure.config.obs_ws_config import load_obs_ws_config, save_obs_ws_config
 import logging
 import platform
 import psutil
@@ -162,6 +163,42 @@ async def take_screenshot(
                     "스크린샷 실패. 저장 경로의 디렉토리가 존재하지 않습니다. 전체 경로가 유효한지 확인하세요."
                 ),
             )
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+# ---------------- WebSocket config (UI)
+
+@router.get("/ws/config")
+async def get_ws_config() -> dict:
+    try:
+        cfg = load_obs_ws_config()
+        return {"host": cfg.get("host"), "port": cfg.get("port"), "password": cfg.get("password")}
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/ws/config")
+async def set_ws_config(payload: dict) -> dict:
+    try:
+        merged = save_obs_ws_config(payload or {})
+        return {"ok": True, "config": {"host": merged.get("host"), "port": merged.get("port")}}
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/ws/reconnect")
+async def ws_reconnect() -> dict:
+    try:
+        # Drop current client to force fresh settings on next call
+        await obs_manager.disconnect()
+        # Optionally attempt a ping connect to validate
+        try:
+            client = await obs_manager.connect()
+            _ = await client.get_version()  # type: ignore[attr-defined]
+        except Exception:
+            pass
+        return {"ok": True}
+    except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=str(exc))
 
 

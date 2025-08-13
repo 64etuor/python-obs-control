@@ -6,6 +6,7 @@ from obsws_python import ReqClient
 from obsws_python.error import OBSSDKRequestError
 
 from .config import settings
+from app.infrastructure.config.obs_ws_config import load_obs_ws_config
 
 logger = logging.getLogger(__name__)
 
@@ -19,23 +20,37 @@ class OBSConnectionManager:
     def __init__(self) -> None:
         self._client: Optional[ReqClient] = None
         self._lock = asyncio.Lock()
+        self._hb_stop: Optional[asyncio.Event] = None
+        self._hb_task: Optional[asyncio.Task] = None
 
     async def connect(self) -> ReqClient:
         async with self._lock:
             if self._client is not None:
                 return self._client
             try:
+                ws = load_obs_ws_config()
                 self._client = ReqClient(
-                    host=settings.obs_host,
-                    port=settings.obs_port,
-                    password=settings.obs_password,
+                    host=ws.get("host", settings.obs_host),
+                    port=int(ws.get("port", settings.obs_port)),
+                    password=ws.get("password", settings.obs_password),
                     timeout=10,
                 )
-                logger.info("OBS connected: %s:%s", settings.obs_host, settings.obs_port)
+                logger.info(
+                    "OBS connected: %s:%s (configured via settings/ui; defaults %s:%s)",
+                    ws.get("host", settings.obs_host),
+                    ws.get("port", settings.obs_port),
+                    settings.obs_host,
+                    settings.obs_port,
+                )
                 return self._client
             except Exception as exc:  # noqa: BLE001
                 self._client = None
-                logger.error("OBS connection failed: %s:%s — %s", settings.obs_host, settings.obs_port, exc)
+                logger.error(
+                    "OBS connection failed: %s:%s — %s",
+                    settings.obs_host,
+                    settings.obs_port,
+                    exc,
+                )
                 raise RuntimeError(
                     f"OBS WebSocket 연결 실패: {settings.obs_host}:{settings.obs_port} — {exc}"
                 )
@@ -46,6 +61,59 @@ class OBSConnectionManager:
 
     async def _to_thread(self, func, *args, **kwargs):
         return await asyncio.to_thread(func, *args, **kwargs)
+
+    async def _request(self, method_name: str, *args, **kwargs):
+        client = await self.connect()
+        method = getattr(client, method_name)
+        try:
+            return await self._to_thread(method, *args, **kwargs)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("OBS request failed (%s); reconnecting: %s", method_name, exc)
+            await self.disconnect()
+            client = await self.connect()
+            method = getattr(client, method_name)
+            return await self._to_thread(method, *args, **kwargs)
+
+    async def _heartbeat_loop(self, stop_event: asyncio.Event) -> None:
+        interval = max(3.0, float(getattr(settings, "obs_heartbeat", 15.0)))
+        backoff = 1.0
+        while not stop_event.is_set():
+            try:
+                try:
+                    await self._request("get_version")
+                    backoff = 1.0
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("OBS heartbeat failed; will retry: %s", exc)
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("OBS heartbeat outer error: %s", exc)
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=interval * backoff)
+            except asyncio.TimeoutError:
+                pass
+            # Optional mild backoff when repeatedly failing (cap at 5x)
+            if self._client is None:
+                backoff = min(backoff * 1.5, 5.0)
+            else:
+                backoff = 1.0
+
+    def start_heartbeat(self) -> None:
+        if self._hb_task is not None and not self._hb_task.done():
+            return
+        self._hb_stop = asyncio.Event()
+        self._hb_task = asyncio.create_task(self._heartbeat_loop(self._hb_stop))
+        logger.info("OBS heartbeat started")
+
+    def stop_heartbeat(self) -> None:
+        try:
+            if self._hb_stop is not None:
+                self._hb_stop.set()
+            if self._hb_task is not None:
+                self._hb_task.cancel()
+        except Exception:  # noqa: BLE001
+            pass
+        finally:
+            self._hb_stop = None
+            self._hb_task = None
 
     # Helpers
     @staticmethod
@@ -67,14 +135,12 @@ class OBSConnectionManager:
     # Public convenience methods (examples)
     async def get_version(self) -> dict:
         logger.debug("obs.get_version")
-        client = await self.connect()
-        resp = await self._to_thread(client.get_version)
+        resp = await self._request("get_version")
         return self._jsonable(resp)
 
     async def get_scenes(self) -> list[dict]:
         logger.debug("obs.get_scenes")
-        client = await self.connect()
-        resp = await self._to_thread(client.get_scene_list)
+        resp = await self._request("get_scene_list")
         scenes = getattr(resp, "scenes", None)
         if scenes is None:
             data = getattr(resp, "datain", {}) or {}
@@ -88,25 +154,20 @@ class OBSConnectionManager:
 
     async def set_current_scene(self, scene_name: str) -> None:
         logger.info("obs.set_current_scene: %s", scene_name)
-        client = await self.connect()
-        # 일부 버전에서 키워드 인자를 허용하지 않으므로 위치 인자로 호출
-        await self._to_thread(client.set_current_program_scene, scene_name)
+        await self._request("set_current_program_scene", scene_name)
 
     async def start_streaming(self) -> None:
         logger.info("obs.start_stream")
-        client = await self.connect()
-        await self._to_thread(client.start_stream)
+        await self._request("start_stream")
 
     async def stop_streaming(self) -> None:
         logger.info("obs.stop_stream")
-        client = await self.connect()
-        await self._to_thread(client.stop_stream)
+        await self._request("stop_stream")
 
 
     async def get_stream_status(self) -> dict:
         logger.debug("obs.get_stream_status")
-        client = await self.connect()
-        resp = await self._to_thread(getattr(client, "get_stream_status"))
+        resp = await self._request("get_stream_status")
         return self._jsonable(resp)
 
     async def toggle_streaming(self) -> None:
@@ -153,8 +214,8 @@ class OBSConnectionManager:
         save_fn = getattr(client, "save_source_screenshot", None)
         if save_fn is not None:
             try:
-                await self._to_thread(
-                    save_fn,
+                await self._request(
+                    "save_source_screenshot",
                     source_name,
                     image_format,
                     image_file_path,
@@ -173,8 +234,8 @@ class OBSConnectionManager:
         get_fn = getattr(client, "get_source_screenshot", None)
         if get_fn is None:
             raise RuntimeError("OBS client does not support screenshots on this version")
-        resp = await self._to_thread(
-            get_fn,
+        resp = await self._request(
+            "get_source_screenshot",
             source_name,
             image_format,
             width,
@@ -197,8 +258,7 @@ class OBSConnectionManager:
 
     async def set_input_settings(self, input_name: str, input_settings: dict, overlay: bool = False) -> None:
         logger.debug("obs.set_input_settings: %s", input_name)
-        client = await self.connect()
-        await self._to_thread(client.set_input_settings, input_name, input_settings, overlay)
+        await self._request("set_input_settings", input_name, input_settings, overlay)
 
     async def update_image_source_file(self, image_input_name: str, new_file_path: str) -> None:
         logger.debug("obs.update_image_source_file: %s -> %s", image_input_name, new_file_path)

@@ -16,22 +16,24 @@ processors:
       fields:
         app: ${APP_NAME:obs-ws-server}
         environment: ${ENV:dev}
-  - timestamp:
-      field: time
-      layouts:
-        - ISO8601
-      timezone: UTC
   - rename:
       fields:
         - from: level
           to: log.level
-        - from: service
-          to: service.name
-        - from: host
-          to: host.name
+        - from: logger
+          to: log.logger
+      ignore_missing: true
+      fail_on_error: false
+  - copy_fields:
+      fields:
+        - from: func
+          to: event.action
+      fail_on_error: false
       ignore_missing: true
 
 setup.template.enabled: true
+# 강제로 인덱스 템플릿 모드로 사용 (데이터스트림과 충돌 방지)
+setup.template.type: index
 setup.template.name: "python-obs-control"
 setup.template.pattern: "python-obs-control-*"
 setup.ilm.enabled: false
@@ -43,6 +45,7 @@ output.elasticsearch:
   hosts: ["http://elasticsearch:9200"]
   index: "python-obs-control-%{[environment]:dev}-%{+yyyy.MM.dd}"
 
-logging.level: info
+logging.level: debug
+logging.selectors: ["*"]
 logging.to_files: false
 logging.to_stderr: true

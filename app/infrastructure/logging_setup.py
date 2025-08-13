@@ -59,12 +59,11 @@ class JsonFormatter(logging.Formatter):
             "filename": record.filename,
             "lineno": record.lineno,
             "func": record.funcName,
-            "process": record.process,
+            "process": {"pid": record.process},
             "thread": record.thread,
         }
-        # ELK-friendly additional fields
-        payload["service"] = getattr(settings, "app_name", "app")
-        payload["host"] = socket.gethostname()
+        payload["service"] = {"name": getattr(settings, "app_name", "app")}
+        payload["host"] = {"name": socket.gethostname()}
         env_name = os.getenv("ENV") or os.getenv("ENVIRONMENT") or None
         if env_name:
             payload["environment"] = env_name

@@ -74,6 +74,7 @@ textarea{min-height:120px;resize:vertical}
   <div class='tabs'>
     <button id='tab_hotkeys' class='tab active'>Hotkeys</button>
     <button id='tab_cameras' class='tab'>Cameras</button>
+    <button id='tab_ws' class='tab'>WebSocket</button>
   </div>
 
   <div id='view_hotkeys'>
@@ -90,15 +91,27 @@ textarea{min-height:120px;resize:vertical}
         <div><label>Front Source</label><input id='pb_front_source' placeholder='cam_front'/></div>
         <div><label>Front Update</label><input id='pb_front_update' placeholder='img_before_front'/></div>
       </div>
+      <div class='grid-2'>
+        <div><label>Front Width</label><input id='pb_front_w' type='number' placeholder='1080'/></div>
+        <div><label>Front Height</label><input id='pb_front_h' type='number' placeholder='1920'/></div>
+      </div>
       <div class='grid-3'>
         <div><label>Side Key</label><div class='row-inline'><input id='pb_side_key' placeholder='F6'/><button type='button' class='btn small ghost' onclick="capture('pb_side_key')">Capture</button><button type='button' class='btn small ghost' onclick="clearVal('pb_side_key')">Clear</button></div></div>
         <div><label>Side Source</label><input id='pb_side_source' placeholder='cam_side'/></div>
         <div><label>Side Update</label><input id='pb_side_update' placeholder='img_before_side'/></div>
       </div>
+      <div class='grid-2'>
+        <div><label>Side Width</label><input id='pb_side_w' type='number' placeholder='1080'/></div>
+        <div><label>Side Height</label><input id='pb_side_h' type='number' placeholder='1920'/></div>
+      </div>
       <div class='grid-3'>
         <div><label>Rear Key</label><div class='row-inline'><input id='pb_rear_key' placeholder='F7'/><button type='button' class='btn small ghost' onclick="capture('pb_rear_key')">Capture</button><button type='button' class='btn small ghost' onclick="clearVal('pb_rear_key')">Clear</button></div></div>
         <div><label>Rear Source</label><input id='pb_rear_source' placeholder='cam_rear'/></div>
         <div><label>Rear Update</label><input id='pb_rear_update' placeholder='img_before_rear'/></div>
+      </div>
+      <div class='grid-2'>
+        <div><label>Rear Width</label><input id='pb_rear_w' type='number' placeholder='1080'/></div>
+        <div><label>Rear Height</label><input id='pb_rear_h' type='number' placeholder='1920'/></div>
       </div>
     </div>
 
@@ -109,15 +122,27 @@ textarea{min-height:120px;resize:vertical}
         <div><label>Front After Source</label><input id='pa_front_source' placeholder='cam_front'/></div>
         <div><label>Front After Update</label><input id='pa_front_update' placeholder='img_after_front'/></div>
       </div>
+      <div class='grid-2'>
+        <div><label>Front After Width</label><input id='pa_front_w' type='number' placeholder='1080'/></div>
+        <div><label>Front After Height</label><input id='pa_front_h' type='number' placeholder='1920'/></div>
+      </div>
       <div class='grid-3'>
         <div><label>Side After Key</label><div class='row-inline'><input id='pa_side_key' placeholder='shift+F6'/><button type='button' class='btn small ghost' onclick="capture('pa_side_key')">Capture</button><button type='button' class='btn small ghost' onclick="clearVal('pa_side_key')">Clear</button></div></div>
         <div><label>Side After Source</label><input id='pa_side_source' placeholder='cam_side'/></div>
         <div><label>Side After Update</label><input id='pa_side_update' placeholder='img_after_side'/></div>
       </div>
+      <div class='grid-2'>
+        <div><label>Side After Width</label><input id='pa_side_w' type='number' placeholder='1080'/></div>
+        <div><label>Side After Height</label><input id='pa_side_h' type='number' placeholder='1920'/></div>
+      </div>
       <div class='grid-3'>
         <div><label>Rear After Key</label><div class='row-inline'><input id='pa_rear_key' placeholder='shift+F7'/><button type='button' class='btn small ghost' onclick="capture('pa_rear_key')">Capture</button><button type='button' class='btn small ghost' onclick="clearVal('pa_rear_key')">Clear</button></div></div>
         <div><label>Rear After Source</label><input id='pa_rear_source' placeholder='cam_rear'/></div>
         <div><label>Rear After Update</label><input id='pa_rear_update' placeholder='img_after_rear'/></div>
+      </div>
+      <div class='grid-2'>
+        <div><label>Rear After Width</label><input id='pa_rear_w' type='number' placeholder='1080'/></div>
+        <div><label>Rear After Height</label><input id='pa_rear_h' type='number' placeholder='1920'/></div>
       </div>
     </div>
 
@@ -178,6 +203,22 @@ textarea{min-height:120px;resize:vertical}
     </div>
   </div>
 
+  <div id='view_ws' class='hidden'>
+    <div class='section'>
+      <h3>OBS WebSocket Settings</h3>
+      <div class='grid-3'>
+        <div><label>Host</label><input id='ws_host' placeholder='127.0.0.1'/></div>
+        <div><label>Port</label><input id='ws_port' type='number' placeholder='4455'/></div>
+        <div><label>Password</label><div class='row-inline'><input id='ws_password' type='password' placeholder='(empty allowed)'/><button type='button' id='ws_pwd_toggle' class='btn small ghost' title='Show/Hide' style='display:flex;align-items:center;gap:6px'><img id='ws_pwd_icon' alt='toggle' width='16' height='16' src='/assets/icons/eye.svg'/></button></div></div>
+      </div>
+      <div class='row-inline' style='margin-top:10px'>
+        <button id='ws_reload' class='btn ghost'>Reload</button>
+        <button id='ws_save' class='btn primary'>Save</button>
+        <span id='ws_status' class='note'></span>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <div id='capture_mask' class='mask'>
@@ -194,16 +235,19 @@ function safe(v, d){ return (v===undefined||v===null)?d:v; }
 
 // Tabs
 function setTab(name){
-  const hot = $('view_hotkeys'), cam=$('view_cameras');
-  const th=$('tab_hotkeys'), tc=$('tab_cameras');
-  const isHot = name==='hotkeys';
+  const hot=$('view_hotkeys'), cam=$('view_cameras'), ws=$('view_ws');
+  const th=$('tab_hotkeys'), tc=$('tab_cameras'), tw=$('tab_ws');
+  const isHot=name==='hotkeys', isCam=name==='cameras', isWs=name==='ws';
   hot.classList.toggle('hidden', !isHot);
-  cam.classList.toggle('hidden', isHot);
+  cam.classList.toggle('hidden', !isCam);
+  ws.classList.toggle('hidden', !isWs);
   th.classList.toggle('active', isHot);
-  tc.classList.toggle('active', !isHot);
+  tc.classList.toggle('active', isCam);
+  tw.classList.toggle('active', isWs);
 }
 $('tab_hotkeys').onclick=()=>setTab('hotkeys');
 $('tab_cameras').onclick=()=>setTab('cameras');
+  $('tab_ws').onclick=()=>setTab('ws');
 
 // ---------------- Hotkeys ----------------
 async function loadHotkeys(){
@@ -211,12 +255,12 @@ async function loadHotkeys(){
   const data = await res.json();
   const cfg = data.hotkeys || {};
   const sc = cfg.screenshot || {}; const pb = sc.procedure_before || {}; const pa = sc.procedure_after || {};
-  const pbf = pb.front || {}; $('pb_front_key').value = safe(pbf.key,'F5'); $('pb_front_source').value = safe(pbf.source,'cam_front'); $('pb_front_update').value = safe(pbf.update_input,'img_before_front');
-  const pbs = pb.side || {}; $('pb_side_key').value = safe(pbs.key,'F6'); $('pb_side_source').value = safe(pbs.source,'cam_side'); $('pb_side_update').value = safe(pbs.update_input,'img_before_side');
-  const pbr = pb.rear || {}; $('pb_rear_key').value = safe(pbr.key,'F7'); $('pb_rear_source').value = safe(pbr.source,'cam_rear'); $('pb_rear_update').value = safe(pbr.update_input,'img_before_rear');
-  const paf = pa.front || {}; $('pa_front_key').value = safe(paf.key,'shift+F5'); $('pa_front_source').value = safe(paf.source,'cam_front'); $('pa_front_update').value = safe(paf.update_input,'img_after_front');
-  const pas = pa.side || {}; $('pa_side_key').value = safe(pas.key,'shift+F6'); $('pa_side_source').value = safe(pas.source,'cam_side'); $('pa_side_update').value = safe(pas.update_input,'img_after_side');
-  const par = pa.rear || {}; $('pa_rear_key').value = safe(par.key,'shift+F7'); $('pa_rear_source').value = safe(par.source,'cam_rear'); $('pa_rear_update').value = safe(par.update_input,'img_after_rear');
+  const pbf = pb.front || {}; $('pb_front_key').value = safe(pbf.key,'F5'); $('pb_front_source').value = safe(pbf.source,'cam_front'); $('pb_front_update').value = safe(pbf.update_input,'img_before_front'); $('pb_front_w').value = safe(pbf.width,1080); $('pb_front_h').value = safe(pbf.height,1920);
+  const pbs = pb.side || {}; $('pb_side_key').value = safe(pbs.key,'F6'); $('pb_side_source').value = safe(pbs.source,'cam_side'); $('pb_side_update').value = safe(pbs.update_input,'img_before_side'); $('pb_side_w').value = safe(pbs.width,1080); $('pb_side_h').value = safe(pbs.height,1920);
+  const pbr = pb.rear || {}; $('pb_rear_key').value = safe(pbr.key,'F7'); $('pb_rear_source').value = safe(pbr.source,'cam_rear'); $('pb_rear_update').value = safe(pbr.update_input,'img_before_rear'); $('pb_rear_w').value = safe(pbr.width,1080); $('pb_rear_h').value = safe(pbr.height,1920);
+  const paf = pa.front || {}; $('pa_front_key').value = safe(paf.key,'shift+F5'); $('pa_front_source').value = safe(paf.source,'cam_front'); $('pa_front_update').value = safe(paf.update_input,'img_after_front'); $('pa_front_w').value = safe(paf.width,1080); $('pa_front_h').value = safe(paf.height,1920);
+  const pas = pa.side || {}; $('pa_side_key').value = safe(pas.key,'shift+F6'); $('pa_side_source').value = safe(pas.source,'cam_side'); $('pa_side_update').value = safe(pas.update_input,'img_after_side'); $('pa_side_w').value = safe(pas.width,1080); $('pa_side_h').value = safe(pas.height,1920);
+  const par = pa.rear || {}; $('pa_rear_key').value = safe(par.key,'shift+F7'); $('pa_rear_source').value = safe(par.source,'cam_rear'); $('pa_rear_update').value = safe(par.update_input,'img_after_rear'); $('pa_rear_w').value = safe(par.width,1080); $('pa_rear_h').value = safe(par.height,1920);
   const h = sc.hair_reference || {}; $('sc_hair_key').value = safe(h.key,'F8'); $('sc_hair_source').value = safe(h.source,'window_capture'); $('sc_hair_update').value = safe(h.update_input,'img_hair_reference'); $('sc_hair_w').value = safe(h.width,1920); $('sc_hair_h').value = safe(h.height,1080);
   // scenes
   // dynamic per-scene grid
@@ -237,14 +281,14 @@ function gatherHotkeys(){
   const out = {
     screenshot: {
       procedure_before: {
-        front: { key: $('pb_front_key').value.trim(), source: $('pb_front_source').value.trim(), update_input: $('pb_front_update').value.trim() },
-        side: { key: $('pb_side_key').value.trim(), source: $('pb_side_source').value.trim(), update_input: $('pb_side_update').value.trim() },
-        rear: { key: $('pb_rear_key').value.trim(), source: $('pb_rear_source').value.trim(), update_input: $('pb_rear_update').value.trim() }
+        front: { key: $('pb_front_key').value.trim(), source: $('pb_front_source').value.trim(), update_input: $('pb_front_update').value.trim(), width: +$('pb_front_w').value||1080, height: +$('pb_front_h').value||1920 },
+        side: { key: $('pb_side_key').value.trim(), source: $('pb_side_source').value.trim(), update_input: $('pb_side_update').value.trim(), width: +$('pb_side_w').value||1080, height: +$('pb_side_h').value||1920 },
+        rear: { key: $('pb_rear_key').value.trim(), source: $('pb_rear_source').value.trim(), update_input: $('pb_rear_update').value.trim(), width: +$('pb_rear_w').value||1080, height: +$('pb_rear_h').value||1920 }
       },
       procedure_after: {
-        front: { key: $('pa_front_key').value.trim(), source: $('pa_front_source').value.trim(), update_input: $('pa_front_update').value.trim() },
-        side: { key: $('pa_side_key').value.trim(), source: $('pa_side_source').value.trim(), update_input: $('pa_side_update').value.trim() },
-        rear: { key: $('pa_rear_key').value.trim(), source: $('pa_rear_source').value.trim(), update_input: $('pa_rear_update').value.trim() }
+        front: { key: $('pa_front_key').value.trim(), source: $('pa_front_source').value.trim(), update_input: $('pa_front_update').value.trim(), width: +$('pa_front_w').value||1080, height: +$('pa_front_h').value||1920 },
+        side: { key: $('pa_side_key').value.trim(), source: $('pa_side_source').value.trim(), update_input: $('pa_side_update').value.trim(), width: +$('pa_side_w').value||1080, height: +$('pa_side_h').value||1920 },
+        rear: { key: $('pa_rear_key').value.trim(), source: $('pa_rear_source').value.trim(), update_input: $('pa_rear_update').value.trim(), width: +$('pa_rear_w').value||1080, height: +$('pa_rear_h').value||1920 }
       },
       hair_reference: { key: $('sc_hair_key').value.trim(), source: $('sc_hair_source').value.trim(), update_input: $('sc_hair_update').value.trim(), width: +$('sc_hair_w').value||1920, height: +$('sc_hair_h').value||1080 }
     }
@@ -372,13 +416,34 @@ $('cams_save').onclick = async function(){
 
 // global toolbar actions
 $('btn_reload').onclick = ()=>{ const t = document.querySelector('.tab.active')?.id || 'tab_hotkeys'; if(t==='tab_hotkeys') loadHotkeys(); else loadCameras(); };
-$('btn_reset').onclick = async ()=>{ const res = await fetch('/api/hotkeys', {method:'POST', headers:{'Content-Type':'application/json'}, body: '{}'}); $('status').textContent = res.ok? 'Hotkeys reset' : ('Error: '+await res.text()); if(res.ok) loadHotkeys(); };
-$('btn_save').onclick = async ()=>{ if(document.querySelector('.tab.active')?.id==='tab_hotkeys'){ await saveHotkeys(); } else { $('cams_save').click(); } };
+  $('btn_reset').onclick = async ()=>{ const res = await fetch('/api/hotkeys', {method:'POST', headers:{'Content-Type':'application/json'}, body: '{}'}); $('status').textContent = res.ok? 'Hotkeys reset' : ('Error: '+await res.text()); if(res.ok) loadHotkeys(); };
+  $('btn_save').onclick = async ()=>{ const id=document.querySelector('.tab.active')?.id; if(id==='tab_hotkeys'){ await saveHotkeys(); } else if(id==='tab_cameras'){ $('cams_save').click(); } else if(id==='tab_ws'){ $('ws_save').click(); } };
+  // ---------------- WebSocket ----------------
+  async function loadWS(){
+    try{
+      const res = await fetch('/api/ws/config'); const j = await res.json();
+      $('ws_host').value = j.host || '127.0.0.1';
+      $('ws_port').value = j.port || 4455;
+      $('ws_password').value = j.password || '';
+      $('ws_status').textContent = '';
+    }catch(e){ $('ws_status').textContent = 'Load failed'; }
+  }
+  async function saveWS(){
+    const body = {host: $('ws_host').value.trim(), port: +$('ws_port').value||4455, password: $('ws_password').value};
+    const res = await fetch('/api/ws/config', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+    $('ws_status').textContent = res.ok? 'Saved' : ('Error: '+await res.text());
+    if(res.ok){ try{ await fetch('/api/ws/reconnect', {method:'POST'}); }catch(e){} }
+  }
+  $('ws_reload').onclick = loadWS;
+  $('ws_save').onclick = saveWS;
+  // show/hide password
+  (function(){ const i=$('ws_password'), b=$('ws_pwd_toggle'), ic=$('ws_pwd_icon'); if(b&&i&&ic){ b.onclick=()=>{ const isPass=i.getAttribute('type')==='password'; i.setAttribute('type', isPass?'text':'password'); ic.src = isPass?'/assets/icons/eye-off.svg':'/assets/icons/eye.svg'; }; } })();
 
 // init
 setTab('hotkeys');
 loadHotkeys();
-loadCameras();
+  loadCameras();
+  loadWS();
 </script>
 </body></html>"""
     return HTMLResponse(content=html)

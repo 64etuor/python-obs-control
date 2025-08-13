@@ -32,14 +32,14 @@ DEFAULT_HOTKEY_CONFIG: Dict[str, Any] = {
     },
     "screenshot": {
         "procedure_before": {
-            "front": {"key": "F5", "source": "cam_front", "update_input": "img_before_front"},
-            "side": {"key": "F6", "source": "cam_side", "update_input": "img_before_side"},
-            "rear": {"key": "F7", "source": "cam_rear", "update_input": "img_before_rear"}
+            "front": {"key": "F5", "source": "cam_front", "update_input": "img_before_front", "width": 1080, "height": 1920},
+            "side": {"key": "F6", "source": "cam_side", "update_input": "img_before_side", "width": 1080, "height": 1920},
+            "rear": {"key": "F7", "source": "cam_rear", "update_input": "img_before_rear", "width": 1080, "height": 1920}
         },
         "procedure_after": {
-            "front": {"key": "shift+F5", "source": "cam_front", "update_input": "img_after_front"},
-            "side": {"key": "shift+F6", "source": "cam_side", "update_input": "img_after_side"},
-            "rear": {"key": "shift+F7", "source": "cam_rear", "update_input": "img_after_rear"}
+            "front": {"key": "shift+F5", "source": "cam_front", "update_input": "img_after_front", "width": 1080, "height": 1920},
+            "side": {"key": "shift+F6", "source": "cam_side", "update_input": "img_after_side", "width": 1080, "height": 1920},
+            "rear": {"key": "shift+F7", "source": "cam_rear", "update_input": "img_after_rear", "width": 1080, "height": 1920}
         },
         "hair_reference": {
             "key": "F8",

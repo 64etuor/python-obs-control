@@ -1,0 +1,143 @@
+﻿{
+    "page":  1,
+    "per_page":  100,
+    "total":  3,
+    "saved_objects":  [
+                          {
+                              "type":  "dashboard",
+                              "id":  "obs_control_overview_simple",
+                              "namespaces":  [
+                                                 "default"
+                                             ],
+                              "attributes":  {
+                                                 "title":  "OBS Control - Overview (Simple)",
+                                                 "timeRestore":  false,
+                                                 "optionsJSON":  "{\"useMargins\":true,\"hidePanelTitles\":false}",
+                                                 "panelsJSON":  "[{\"type\":\"visualization\",\"gridData\":{\"x\":0,\"y\":0,\"w\":48,\"h\":12,\"i\":\"1\"},\"panelIndex\":\"1\",\"embeddableConfig\":{\"enhancements\":{}},\"panelRefName\":\"panel_1\"}]",
+                                                 "version":  1,
+                                                 "kibanaSavedObjectMeta":  {
+                                                                               "searchSourceJSON":  "{\"query\":{\"language\":\"kuery\",\"query\":\"\"},\"filter\":[]}"
+                                                                           }
+                                             },
+                              "references":  [
+                                                 {
+                                                     "name":  "1:panel_1",
+                                                     "type":  "visualization",
+                                                     "id":  "obs_info_markdown"
+                                                 }
+                                             ],
+                              "managed":  false,
+                              "migrationVersion":  {
+                                                       "dashboard":  "8.9.0"
+                                                   },
+                              "updated_at":  "2025-08-12T00:10:08.744Z",
+                              "created_at":  "2025-08-12T00:10:08.744Z",
+                              "version":  "WzE3LDVd",
+                              "coreMigrationVersion":  "8.8.0",
+                              "typeMigrationVersion":  "8.9.0",
+                              "score":  0
+                          },
+                          {
+                              "type":  "dashboard",
+                              "id":  "obs_control_overview_lens",
+                              "namespaces":  [
+                                                 "default"
+                                             ],
+                              "attributes":  {
+                                                 "title":  "OBS Control - Overview (Lens)",
+                                                 "timeRestore":  true,
+                                                 "timeFrom":  "now-24h",
+                                                 "timeTo":  "now",
+                                                 "optionsJSON":  "{\"useMargins\":true,\"hidePanelTitles\":false}",
+                                                 "panelsJSON":  "[{\"type\":\"lens\",\"gridData\":{\"x\":0,\"y\":0,\"w\":24,\"h\":12,\"i\":\"1\"},\"panelIndex\":\"1\",\"embeddableConfig\":{\"enhancements\":{}},\"panelRefName\":\"panel_1\"},{\"type\":\"lens\",\"gridData\":{\"x\":24,\"y\":0,\"w\":24,\"h\":12,\"i\":\"2\"},\"panelIndex\":\"2\",\"embeddableConfig\":{\"enhancements\":{}},\"panelRefName\":\"panel_2\"},{\"type\":\"lens\",\"gridData\":{\"x\":0,\"y\":12,\"w\":24,\"h\":12,\"i\":\"3\"},\"panelIndex\":\"3\",\"embeddableConfig\":{\"enhancements\":{}},\"panelRefName\":\"panel_3\"},{\"type\":\"lens\",\"gridData\":{\"x\":24,\"y\":12,\"w\":24,\"h\":12,\"i\":\"4\"},\"panelIndex\":\"4\",\"embeddableConfig\":{\"enhancements\":{}},\"panelRefName\":\"panel_4\"}]",
+                                                 "version":  3,
+                                                 "kibanaSavedObjectMeta":  {
+                                                                               "searchSourceJSON":  "{\"query\":{\"language\":\"kuery\",\"query\":\"\"},\"filter\":[]}"
+                                                                           }
+                                             },
+                              "references":  [
+                                                 {
+                                                     "name":  "1:panel_1",
+                                                     "type":  "lens",
+                                                     "id":  "logs_timeseries_count_lens"
+                                                 },
+                                                 {
+                                                     "name":  "2:panel_2",
+                                                     "type":  "lens",
+                                                     "id":  "logs_top_loggers_lens"
+                                                 },
+                                                 {
+                                                     "name":  "3:panel_3",
+                                                     "type":  "lens",
+                                                     "id":  "metrics_cpu_percent_lens"
+                                                 },
+                                                 {
+                                                     "name":  "4:panel_4",
+                                                     "type":  "lens",
+                                                     "id":  "metrics_process_rss_lens"
+                                                 }
+                                             ],
+                              "managed":  false,
+                              "migrationVersion":  {
+                                                       "dashboard":  "8.9.0"
+                                                   },
+                              "updated_at":  "2025-08-12T01:59:04.247Z",
+                              "created_at":  "2025-08-12T01:59:04.247Z",
+                              "version":  "Wzk1LDdd",
+                              "coreMigrationVersion":  "8.8.0",
+                              "typeMigrationVersion":  "8.9.0",
+                              "score":  0
+                          },
+                          {
+                              "type":  "dashboard",
+                              "id":  "obs_control_dashboard_v2",
+                              "namespaces":  [
+                                                 "default"
+                                             ],
+                              "attributes":  {
+                                                 "title":  "OBS Control Dashboard V2",
+                                                 "timeRestore":  true,
+                                                 "timeFrom":  "now-24h",
+                                                 "timeTo":  "now",
+                                                 "optionsJSON":  "{\"useMargins\":true,\"hidePanelTitles\":false}",
+                                                 "panelsJSON":  "[{\"type\":\"lens\",\"gridData\":{\"x\":0,\"y\":0,\"w\":24,\"h\":12,\"i\":\"panel_1\"},\"panelIndex\":\"panel_1\",\"embeddableConfig\":{\"enhancements\":{}},\"panelRefName\":\"panel_panel_1\"},{\"type\":\"lens\",\"gridData\":{\"x\":24,\"y\":0,\"w\":24,\"h\":12,\"i\":\"panel_2\"},\"panelIndex\":\"panel_2\",\"embeddableConfig\":{\"enhancements\":{}},\"panelRefName\":\"panel_panel_2\"},{\"type\":\"lens\",\"gridData\":{\"x\":0,\"y\":12,\"w\":24,\"h\":12,\"i\":\"panel_3\"},\"panelIndex\":\"panel_3\",\"embeddableConfig\":{\"enhancements\":{}},\"panelRefName\":\"panel_panel_3\"},{\"type\":\"lens\",\"gridData\":{\"x\":24,\"y\":12,\"w\":24,\"h\":12,\"i\":\"panel_4\"},\"panelIndex\":\"panel_4\",\"embeddableConfig\":{\"enhancements\":{}},\"panelRefName\":\"panel_panel_4\"}]",
+                                                 "version":  1,
+                                                 "kibanaSavedObjectMeta":  {
+                                                                               "searchSourceJSON":  "{\"query\":{\"language\":\"kuery\",\"query\":\"\"},\"filter\":[]}"
+                                                                           }
+                                             },
+                              "references":  [
+                                                 {
+                                                     "name":  "panel_1:panel_panel_1",
+                                                     "type":  "lens",
+                                                     "id":  "logs_timeseries_count_lens"
+                                                 },
+                                                 {
+                                                     "name":  "panel_2:panel_panel_2",
+                                                     "type":  "lens",
+                                                     "id":  "logs_timeseries_count_lens"
+                                                 },
+                                                 {
+                                                     "name":  "panel_3:panel_panel_3",
+                                                     "type":  "lens",
+                                                     "id":  "logs_top_loggers_lens"
+                                                 },
+                                                 {
+                                                     "name":  "panel_4:panel_panel_4",
+                                                     "type":  "lens",
+                                                     "id":  "metrics_cpu_percent_lens"
+                                                 }
+                                             ],
+                              "managed":  false,
+                              "migrationVersion":  {
+                                                       "dashboard":  "8.9.0"
+                                                   },
+                              "updated_at":  "2025-08-12T02:07:39.962Z",
+                              "created_at":  "2025-08-12T02:07:39.962Z",
+                              "version":  "WzExNSw3XQ==",
+                              "coreMigrationVersion":  "8.8.0",
+                              "typeMigrationVersion":  "8.9.0",
+                              "score":  0
+                          }
+                      ]
+}

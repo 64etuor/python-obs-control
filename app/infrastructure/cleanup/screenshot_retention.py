@@ -30,7 +30,19 @@ async def load_settings() -> ScreenshotRetention:
     async with _settings_lock:
         try:
             if not _DEFAULT_CONFIG_FILE.exists():
-                return ScreenshotRetention()
+                try:
+                    _DEFAULT_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+                except Exception:
+                    pass
+                default_value = ScreenshotRetention()
+                try:
+                    _DEFAULT_CONFIG_FILE.write_text(
+                        json.dumps(asdict(default_value), ensure_ascii=False, indent=2),
+                        encoding="utf-8",
+                    )
+                except Exception:
+                    pass
+                return default_value
             data = json.loads(_DEFAULT_CONFIG_FILE.read_text(encoding="utf-8"))
             return ScreenshotRetention(
                 enabled=bool(data.get("enabled", True)),
@@ -94,7 +106,7 @@ async def retention_loop(stop_event: asyncio.Event, paths: list[str]) -> None:
         try:
             cfg = await load_settings()
             if cfg.enabled and cfg.days > 0:
-                result = cleanup_once(paths, days=cfg.days)
+                result = await asyncio.to_thread(cleanup_once, paths, days=cfg.days)
                 _log.info(
                     "screenshot retention: checked=%s deleted=%s bytes=%s cutoff=%s",
                     result.get("checked"),

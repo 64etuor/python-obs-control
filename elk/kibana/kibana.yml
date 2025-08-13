@@ -3,3 +3,9 @@ vis_type_vega.enableExternalUrls: true
 server.host: "0.0.0.0"
 server.port: 5601
 server.publicBaseUrl: "http://localhost:5601"
+
+# Reduce likelihood of plugin/runtime 500s during saved objects import by setting encryption keys
+# 32+ char random strings are recommended
+xpack.encryptedSavedObjects.encryptionKey: "c37f1b0f7f2e4b0d9a8b3c4d5e6f7a8b_c37f1b0f7f2e4b0d9a8b3c4d5e6f7a8b"
+xpack.reporting.encryptionKey: "9f8e7d6c5b4a3f2e1d0c9b8a7e6d5c4b_9f8e7d6c5b4a3f2e1d0c9b8a7e6d5c4b"
+xpack.security.encryptionKey: "b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6_b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6"

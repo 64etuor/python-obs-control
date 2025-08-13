@@ -125,7 +125,8 @@ def _ensure_obs_ws_enabled() -> None:
 
     config = configparser.ConfigParser()
     if cfg_path.exists():
-        config.read(cfg_path, encoding="utf-8")
+        # Handle files saved with UTF-8 BOM
+        config.read(cfg_path, encoding="utf-8-sig")
 
     if "OBSWebSocket" not in config:
         config["OBSWebSocket"] = {}
@@ -140,7 +141,8 @@ def _ensure_obs_ws_enabled() -> None:
         ws.setdefault("ServerPassword", settings.obs_password)
         ws["ServerPassword"] = settings.obs_password
 
-    with cfg_path.open("w", encoding="utf-8") as f:
+    # Preserve BOM to stay compatible with OBS-written files
+    with cfg_path.open("w", encoding="utf-8-sig") as f:
         config.write(f)
 
 
@@ -158,7 +160,8 @@ def _ensure_obs_general_prefs() -> None:
 
     config = configparser.ConfigParser()
     if cfg_path.exists():
-        config.read(cfg_path, encoding="utf-8")
+        # Handle files saved with UTF-8 BOM
+        config.read(cfg_path, encoding="utf-8-sig")
 
     if "General" not in config:
         config["General"] = {}
@@ -170,7 +173,8 @@ def _ensure_obs_general_prefs() -> None:
     gen.setdefault("ShowSafeModeDialog", "false")
     gen["ShowSafeModeDialog"] = "false"
 
-    with cfg_path.open("w", encoding="utf-8") as f:
+    # Preserve BOM to stay compatible with OBS-written files
+    with cfg_path.open("w", encoding="utf-8-sig") as f:
         config.write(f)
 
 
